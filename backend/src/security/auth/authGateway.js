@@ -12,7 +12,10 @@ export const performAuth = async (c) => {
 
   if (!authResult) {
     const repositoryFactory = c.get("repos") ?? useRepositories(c);
-    authService = createAuthService(c.env.DB, repositoryFactory);
+    authService = createAuthService(c.env.DB, repositoryFactory, {
+      ecoSsoSecret: c.env.ECO_SSO_SECRET,
+      allowLegacyAuth: String(c.env.ALLOW_LEGACY_AUTH || "") === "1",
+    });
 
     const authHeader = c.req.header("Authorization");
     authResult = await authService.authenticate(authHeader);

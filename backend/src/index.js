@@ -162,6 +162,16 @@ app.use("*", errorBoundary());
 app.use("*", withRepositories());
 app.use("*", securityContext());
 
+// Restrict which sites are allowed to embed CloudPaste in an iframe.
+// Configure with env.ECO_FRAME_ANCESTORS, e.g. "https://eco-guide.pages.dev https://*.eco-guide.pages.dev"
+app.use("*", async (c, next) => {
+  await next();
+  const ancestors = c.env?.ECO_FRAME_ANCESTORS;
+  if (ancestors) {
+    c.header("Content-Security-Policy", `frame-ancestors ${ancestors};`);
+  }
+});
+
 // 根路径WebDAV OPTIONS兼容性处理器
 // 为1Panel等客户端提供WebDAV能力发现支持
 // 必须在其他路由注册之前，确保优先匹配

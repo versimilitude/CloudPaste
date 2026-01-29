@@ -26,6 +26,8 @@ export function buildAuthHeaders(baseHeaders = {}) {
       headers.Authorization = `Bearer ${authState.adminToken}`;
     } else if (authState.authType === "apikey" && authState.apiKey) {
       headers.Authorization = `ApiKey ${authState.apiKey}`;
+    } else if (authState.authType === "ecosso" && authState.ecoSsoToken) {
+      headers.Authorization = `EcoSSO ${authState.ecoSsoToken}`;
     }
   }
 

@@ -4,7 +4,7 @@ let logoutHandler = null;
 
 /**
  * 注册认证状态访问器与登出处理
- * @param {{ getSnapshot: () => { authType: string, adminToken: string|null, apiKey: string|null, isAuthenticated: boolean }, logout: () => Promise<void> }} bridge
+ * @param {{ getSnapshot: () => { authType: string, adminToken: string|null, apiKey: string|null, ecoSsoToken: string|null, isAuthenticated: boolean }, logout: () => Promise<void> }} bridge
  */
 export function registerAuthBridge({ getSnapshot, logout }) {
   authStateAccessor = getSnapshot;
@@ -13,7 +13,7 @@ export function registerAuthBridge({ getSnapshot, logout }) {
 
 /**
  * 获取当前认证快照（无依赖）
- * @returns {{ authType: string, adminToken: string|null, apiKey: string|null, isAuthenticated: boolean }|null}
+ * @returns {{ authType: string, adminToken: string|null, apiKey: string|null, ecoSsoToken: string|null, isAuthenticated: boolean }|null}
  */
 export function getAuthSnapshot() {
   return typeof authStateAccessor === "function" ? authStateAccessor() : null;

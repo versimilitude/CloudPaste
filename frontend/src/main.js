@@ -188,6 +188,50 @@ app.mount("#app");
 const authStore = useAuthStore();
 const siteConfigStore = useSiteConfigStore();
 
+// EcoSSO bridge (embedded in Eco-Guide via iframe)
+try {
+  const isEmbedded = typeof window !== "undefined" && window.parent && window.parent !== window;
+  if (isEmbedded) {
+    let parentOrigin = null;
+    try {
+      if (document.referrer) {
+        parentOrigin = new URL(document.referrer).origin;
+      }
+    } catch (e) {
+      parentOrigin = null;
+    }
+
+    const postToParent = (msg) => {
+      try {
+        window.parent.postMessage(msg, parentOrigin || "*");
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    window.addEventListener("message", (event) => {
+      if (parentOrigin && event.origin !== parentOrigin) return;
+      const data = event.data || {};
+      if (data?.type === "ECO_SSO") {
+        authStore.setEcoSsoSession({
+          token: data.token,
+          role: data.role,
+          orgId: data.orgId,
+          orgName: data.orgName,
+          expiresAt: data.expiresAt,
+        });
+      }
+      if (data?.type === "ECO_SSO_PING") {
+        postToParent({ type: "ECO_SSO_PONG" });
+      }
+    });
+
+    postToParent({ type: "ECO_SSO_READY" });
+  }
+} catch (e) {
+  // ignore
+}
+
 // 并行初始化两个Store
 Promise.all([authStore.initialize(), siteConfigStore.initialize()])
   .then(() => {

@@ -354,6 +354,27 @@ export async function fetchApi(endpoint, options = {}) {
         }
 
         // API密钥处理
+        if (authHeader.startsWith("EcoSSO ")) {
+          try {
+            const isEmbedded = typeof window !== "undefined" && window.parent && window.parent !== window;
+            if (isEmbedded) {
+              let parentOrigin = null;
+              try {
+                if (document.referrer) parentOrigin = new URL(document.referrer).origin;
+              } catch (e) {
+                parentOrigin = null;
+              }
+              window.parent.postMessage({ type: "ECO_SSO_REFRESH" }, parentOrigin || "*");
+            }
+          } catch (e) {
+            // ignore
+          }
+
+          const error = new Error("SSO session expired or unauthorized. Refreshing token...");
+          error.__logged = true;
+          throw error;
+        }
+
         if (authHeader.startsWith("ApiKey ")) {
           const isPermissionIssue =
             responseData &&

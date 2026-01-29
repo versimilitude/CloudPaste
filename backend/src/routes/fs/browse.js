@@ -546,6 +546,18 @@ export const registerBrowseRoutes = (router, helpers) => {
     const encryptionSecret = getEncryptionSecret(c);
     const repositoryFactory = c.get("repos");
 
+    const principal = c.get("principal");
+    const keyInfo = principal?.attributes?.keyInfo;
+    const isEcoViewer = keyInfo?.provider === "eco" && String(keyInfo?.ecoRole || keyInfo?.role || "").toLowerCase() === "viewer";
+    if (isEcoViewer) {
+      return c.json(
+        {
+          ...createErrorResponse(ApiStatus.FORBIDDEN, "Viewer cannot download files.", "ECO_VIEWER_DOWNLOAD_FORBIDDEN"),
+        },
+        ApiStatus.FORBIDDEN,
+      );
+    }
+
     if (refresh) {
       console.log("[后端路由] 收到强制刷新请求:", { path, refresh });
     }
@@ -725,7 +737,10 @@ export const registerBrowseRoutes = (router, helpers) => {
     }
 
     const previewUrl = previewLink?.url || null;
-    const downloadUrl = downloadLink?.url || null;
+    const principal = c.get("principal");
+    const keyInfo = principal?.attributes?.keyInfo;
+    const isEcoViewer = keyInfo?.provider === "eco" && String(keyInfo?.ecoRole || keyInfo?.role || "").toLowerCase() === "viewer";
+    const downloadUrl = isEcoViewer ? null : downloadLink?.url || null;
     const linkType = previewLink?.kind || null;
 
     const responsePayload = {
@@ -916,6 +931,18 @@ export const registerBrowseRoutes = (router, helpers) => {
       expiresInParam === undefined || expiresInParam === "null" ? null : parseInt(expiresInParam, 10);
     const expiresIn = parsedExpiresIn !== null && Number.isNaN(parsedExpiresIn) ? null : parsedExpiresIn;
     const forceDownload = getQueryBool(c, "force_download", false);
+
+    const principal = c.get("principal");
+    const keyInfo = principal?.attributes?.keyInfo;
+    const isEcoViewer = keyInfo?.provider === "eco" && String(keyInfo?.ecoRole || keyInfo?.role || "").toLowerCase() === "viewer";
+    if (isEcoViewer) {
+      return c.json(
+        {
+          ...createErrorResponse(ApiStatus.FORBIDDEN, "Viewer cannot generate file links.", "ECO_VIEWER_FILE_LINK_FORBIDDEN"),
+        },
+        ApiStatus.FORBIDDEN,
+      );
+    }
 
     if (!path) {
       throw new ValidationError("请提供文件路径");

@@ -9,6 +9,57 @@ import { checkAndDeleteExpiredApiKey } from "../../services/apiKeyService.js";
 import { verifyPassword } from "../../utils/crypto.js";
 import { ensureRepositoryFactory } from "../../utils/repositories.js";
 
+const jwtTextEncoder = new TextEncoder();
+const jwtTextDecoder = new TextDecoder();
+
+function base64UrlToUint8Array(input) {
+  if (!input || typeof input !== "string") return null;
+  const b64 = input.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = b64.length % 4;
+  const padded = pad === 0 ? b64 : b64 + "=".repeat(4 - pad);
+  let raw;
+  try {
+    raw = atob(padded);
+  } catch {
+    return null;
+  }
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+}
+
+async function verifyJwtHs256(token, secret) {
+  if (!token || typeof token !== "string") {
+    throw new Error("Invalid token");
+  }
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    throw new Error("Invalid token");
+  }
+  const [encodedHeader, encodedPayload, encodedSig] = parts;
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+  const signatureBytes = base64UrlToUint8Array(encodedSig);
+  if (!signatureBytes) throw new Error("Invalid signature");
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    jwtTextEncoder.encode(String(secret)),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"],
+  );
+
+  const ok = await crypto.subtle.verify("HMAC", key, signatureBytes, jwtTextEncoder.encode(signingInput));
+  if (!ok) throw new Error("Invalid signature");
+
+  const payloadBytes = base64UrlToUint8Array(encodedPayload);
+  if (!payloadBytes) throw new Error("Invalid payload");
+  const payloadText = jwtTextDecoder.decode(payloadBytes);
+  const payload = JSON.parse(payloadText);
+  return payload;
+}
+
 /**
  * 认证结果类
  * 包含网关需要的核心属性和方法
@@ -94,14 +145,79 @@ export class AuthResult {
  * 认证服务类 - 基于位标志权限系统
  */
 export class AuthService {
-  constructor(db, repositoryFactory = null) {
+  constructor(db, repositoryFactory = null, options = {}) {
     this.db = db;
     this.repositoryFactory = ensureRepositoryFactory(db, repositoryFactory);
+    this.ecoSsoSecret = options?.ecoSsoSecret || null;
+    this.allowLegacyAuth = Boolean(options?.allowLegacyAuth);
   }
 
   /**
    * 解析认证头
    */
+  async validateEcoSsoAuth(token) {
+    const secret = this.ecoSsoSecret;
+    if (!secret || typeof secret !== "string") {
+      return new AuthResult();
+    }
+
+    let payload;
+    try {
+      payload = await verifyJwtHs256(token, secret);
+    } catch {
+      return new AuthResult();
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (!payload || typeof payload !== "object") return new AuthResult();
+    if (payload.iss !== "eco-guide") return new AuthResult();
+    if (payload.aud !== "cloudpaste") return new AuthResult();
+    if (typeof payload.exp !== "number" || payload.exp < now) return new AuthResult();
+
+    const orgId = Number(payload.org_id);
+    if (!Number.isFinite(orgId) || orgId <= 0) return new AuthResult();
+
+    const role = String(payload.role || "viewer").toLowerCase();
+    const sub = String(payload.sub || "");
+    if (!sub) return new AuthResult();
+
+    const basicPath = `/drive/org/${orgId}`;
+
+    const canEdit = role === "owner" || role === "admin" || role === "member";
+    const permissions = canEdit
+      ? Permission.MOUNT_VIEW |
+        Permission.MOUNT_UPLOAD |
+        Permission.MOUNT_COPY |
+        Permission.MOUNT_RENAME |
+        Permission.MOUNT_DELETE |
+        Permission.FILE_SHARE |
+        Permission.FILE_MANAGE
+      : Permission.MOUNT_VIEW;
+
+    const principalId = `eco:${sub}`;
+
+    return new AuthResult({
+      isAuthenticated: true,
+      userId: principalId,
+      permissions,
+      basicPath,
+      isAdmin: false,
+      keyInfo: {
+        id: principalId,
+        name: principalId,
+        key: null,
+        basicPath,
+        permissions,
+        role,
+        isGuest: false,
+        isEnabled: true,
+        provider: "eco",
+        ecoRole: role,
+        ecoOrgId: orgId,
+      },
+    });
+  }
+
   parseAuthHeader(authHeader) {
     if (!authHeader) {
       return { type: null, token: null };
@@ -278,6 +394,10 @@ export class AuthService {
       return new AuthResult();
     }
 
+    if ((type === "bearer" || type === "apikey" || type === "basic") && !this.allowLegacyAuth) {
+      return new AuthResult();
+    }
+
     let result;
     switch (type) {
       case "bearer":
@@ -285,6 +405,9 @@ export class AuthService {
         break;
       case "apikey":
         result = await this.validateApiKeyAuth(token);
+        break;
+      case "ecosso":
+        result = await this.validateEcoSsoAuth(token);
         break;
       case "basic":
         result = await this.validateBasicAuth(token);
@@ -340,6 +463,6 @@ export class AuthService {
 /**
  * 创建认证服务实例
  */
-export function createAuthService(db, repositoryFactory = null) {
-  return new AuthService(db, repositoryFactory);
+export function createAuthService(db, repositoryFactory = null, options = {}) {
+  return new AuthService(db, repositoryFactory, options);
 }

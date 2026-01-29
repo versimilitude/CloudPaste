@@ -26,7 +26,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   // 认证状态
   const isAuthenticated = ref(false);
-  const authType = ref("none"); // 'none' | 'admin' | 'apikey'
+  const authType = ref("none"); // 'none' | 'admin' | 'apikey' | 'ecosso'
   const isLoading = ref(false);
   const guestAutoTried = ref(false);
   const lastValidated = ref(null);
@@ -40,6 +40,14 @@ export const useAuthStore = defineStore("auth", () => {
   const apiKeyInfo = ref(null);
   // 使用位标志权限系统
   const apiKeyPermissions = ref(0); // 位标志权限值
+
+  // EcoSSO (embedded) session. Short-lived token (in-memory only).
+  const ecoSsoToken = ref(null);
+  const ecoRole = ref(null);
+  const ecoOrgId = ref(null);
+  const ecoOrgName = ref(null);
+  const ecoExpiresAt = ref(null);
+
   const apiKeyPermissionDetails = ref({
     text_share: false,
     text_manage: false,
@@ -66,34 +74,73 @@ export const useAuthStore = defineStore("auth", () => {
   // 是否为管理员 / Key 用户（从 authType 推导，消除冗余状态）
   const isAdmin = computed(() => authType.value === "admin");
   const isKeyUser = computed(() => authType.value === "apikey");
+  const isEco = computed(() => authType.value === "ecosso");
   const isGuest = computed(() => {
     if (!isKeyUser.value) return false;
     const role = apiKeyInfo.value?.role || apiKeyInfo.value?.Role;
     return role === "GUEST";
   });
 
+  const ecoPermissions = computed(() => {
+    if (!isEco.value) return 0;
+    const role = String(ecoRole.value || "viewer").toLowerCase();
+    const canEdit = role === "owner" || role === "admin" || role === "member";
+    return canEdit
+      ? Permission.TEXT_SHARE |
+          Permission.FILE_SHARE |
+          Permission.TEXT_MANAGE |
+          Permission.FILE_MANAGE |
+          Permission.MOUNT_VIEW |
+          Permission.MOUNT_UPLOAD |
+          Permission.MOUNT_COPY |
+          Permission.MOUNT_RENAME |
+          Permission.MOUNT_DELETE
+      : Permission.MOUNT_VIEW;
+  });
+
+  const effectivePermissions = computed(() => {
+    if (isAdmin.value) {
+      return (
+        Permission.TEXT_SHARE |
+        Permission.FILE_SHARE |
+        Permission.TEXT_MANAGE |
+        Permission.FILE_MANAGE |
+        Permission.MOUNT_VIEW |
+        Permission.MOUNT_UPLOAD |
+        Permission.MOUNT_COPY |
+        Permission.MOUNT_RENAME |
+        Permission.MOUNT_DELETE |
+        Permission.WEBDAV_READ |
+        Permission.WEBDAV_MANAGE
+      );
+    }
+    if (isKeyUser.value) return apiKeyPermissions.value || 0;
+    if (isEco.value) return ecoPermissions.value || 0;
+    return 0;
+  });
+
   // 文本/文件分享权限（创建 vs 管理）
   const hasTextSharePermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.TEXT_SHARE);
+    return isAdmin.value || PermissionChecker.hasPermission(effectivePermissions.value, Permission.TEXT_SHARE);
   });
 
   const hasTextManagePermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.TEXT_MANAGE);
+    return isAdmin.value || PermissionChecker.hasPermission(effectivePermissions.value, Permission.TEXT_MANAGE);
   });
 
   const hasFileSharePermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.FILE_SHARE);
+    return isAdmin.value || PermissionChecker.hasPermission(effectivePermissions.value, Permission.FILE_SHARE);
   });
 
   const hasFileManagePermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.FILE_MANAGE);
+    return isAdmin.value || PermissionChecker.hasPermission(effectivePermissions.value, Permission.FILE_MANAGE);
   });
 
   // 是否有挂载权限（任一挂载权限）
   const hasMountPermission = computed(() => {
     return (
       isAdmin.value ||
-      PermissionChecker.hasAnyPermission(apiKeyPermissions.value, [
+      PermissionChecker.hasAnyPermission(effectivePermissions.value, [
         Permission.MOUNT_VIEW,
         Permission.MOUNT_UPLOAD,
         Permission.MOUNT_COPY,
@@ -105,32 +152,32 @@ export const useAuthStore = defineStore("auth", () => {
 
   // 详细的挂载权限检查
   const hasMountViewPermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.MOUNT_VIEW);
+    return isAdmin.value || PermissionChecker.hasPermission(effectivePermissions.value, Permission.MOUNT_VIEW);
   });
 
   const hasMountUploadPermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.MOUNT_UPLOAD);
+    return isAdmin.value || PermissionChecker.hasPermission(effectivePermissions.value, Permission.MOUNT_UPLOAD);
   });
 
   const hasMountCopyPermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.MOUNT_COPY);
+    return isAdmin.value || PermissionChecker.hasPermission(effectivePermissions.value, Permission.MOUNT_COPY);
   });
 
   const hasMountRenamePermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.MOUNT_RENAME);
+    return isAdmin.value || PermissionChecker.hasPermission(effectivePermissions.value, Permission.MOUNT_RENAME);
   });
 
   const hasMountDeletePermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.MOUNT_DELETE);
+    return isAdmin.value || PermissionChecker.hasPermission(effectivePermissions.value, Permission.MOUNT_DELETE);
   });
 
   // WebDAV权限检查
   const hasWebDAVReadPermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.WEBDAV_READ);
+    return isAdmin.value || PermissionChecker.hasPermission(effectivePermissions.value, Permission.WEBDAV_READ);
   });
 
   const hasWebDAVManagePermission = computed(() => {
-    return isAdmin.value || PermissionChecker.hasPermission(apiKeyPermissions.value, Permission.WEBDAV_MANAGE);
+    return isAdmin.value || PermissionChecker.hasPermission(effectivePermissions.value, Permission.WEBDAV_MANAGE);
   });
 
   // 是否需要重新验证（使用配置常量）
@@ -244,6 +291,11 @@ export const useAuthStore = defineStore("auth", () => {
     adminToken.value = null;
     apiKey.value = null;
     apiKeyInfo.value = null;
+    ecoSsoToken.value = null;
+    ecoRole.value = null;
+    ecoOrgId.value = null;
+    ecoOrgName.value = null;
+    ecoExpiresAt.value = null;
     apiKeyPermissions.value = 0; // 重置为无权限
     userInfo.value = {
       id: null,
@@ -289,6 +341,45 @@ export const useAuthStore = defineStore("auth", () => {
   /**
    * 初始化认证状态
    */
+  const setEcoSsoSession = (payload) => {
+    const nextToken = payload?.token;
+    if (!nextToken || typeof nextToken !== "string") {
+      return false;
+    }
+
+    const nextOrgId = Number(payload?.orgId ?? payload?.org_id ?? payload?.ecoOrgId ?? payload?.eco_org_id);
+    const orgIdValue = Number.isFinite(nextOrgId) && nextOrgId > 0 ? nextOrgId : null;
+
+    clearStorage();
+    isAuthenticated.value = true;
+    authType.value = "ecosso";
+    ecoSsoToken.value = nextToken;
+    ecoRole.value = String(payload?.role || "viewer").toLowerCase();
+    ecoOrgId.value = orgIdValue;
+    ecoOrgName.value = payload?.orgName ? String(payload.orgName) : null;
+    ecoExpiresAt.value = Number(payload?.expiresAt) || null;
+
+    userInfo.value = {
+      id: null,
+      name: ecoOrgName.value,
+      basicPath: orgIdValue ? `/drive/org/${orgIdValue}` : "/",
+    };
+    lastValidated.value = Date.now();
+    guestAutoTried.value = true;
+
+    try {
+      window.dispatchEvent(
+        new CustomEvent("auth-state-changed", {
+          detail: { type: "ecosso", isAuthenticated: true },
+        })
+      );
+    } catch (e) {
+      // ignore
+    }
+
+    return true;
+  };
+
   const initialize = async () => {
     if (initialized.value) {
       return;
@@ -644,7 +735,8 @@ export const useAuthStore = defineStore("auth", () => {
    */
   const hasPathPermission = (path) => {
     if (isAdmin.value) return true;
-    if (!isAuthenticated.value || authType.value !== "apikey") return false;
+    if (!isAuthenticated.value) return false;
+    if (!isKeyUser.value && !isEco.value) return false;
 
     const basicPath = userInfo.value.basicPath || "/";
     const normalizedBasicPath = basicPath === "/" ? "/" : basicPath.replace(/\/+$/, "");
@@ -696,6 +788,7 @@ export const useAuthStore = defineStore("auth", () => {
       authType: authType.value,
       adminToken: adminToken.value,
       apiKey: apiKey.value,
+      ecoSsoToken: ecoSsoToken.value,
       isAuthenticated: isAuthenticated.value,
     }),
     logout,
@@ -710,10 +803,16 @@ export const useAuthStore = defineStore("auth", () => {
     isAdmin,
     isGuest,
     isKeyUser,
+    isEco,
     adminToken,
     apiKey,
     apiKeyInfo,
     apiKeyPermissions,
+    ecoSsoToken,
+    ecoRole,
+    ecoOrgId,
+    ecoOrgName,
+    ecoExpiresAt,
     userInfo,
     lastValidated,
     initialized,
@@ -740,6 +839,7 @@ export const useAuthStore = defineStore("auth", () => {
     apiKeyLogin,
     guestLogin,
     maybeAutoGuestLogin,
+    setEcoSsoSession,
     logout,
     hasPermission,
     hasPathPermission,
