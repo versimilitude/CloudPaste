@@ -252,9 +252,42 @@ const ecoSsoBootstrap = async () => {
     if (!orgId) return;
     if (authStore.isAuthenticated && authStore.authType === "ecosso" && authStore.ecoOrgId === Number(orgId)) return;
 
-    const r = await fetch(`/api/drive/sso?orgId=${encodeURIComponent(String(orgId))}`, { credentials: "include" });
-    if (!r.ok) return;
-    const payload = await r.json();
+    const redirectToLogin = () => {
+      try {
+        const redirect = window.location.pathname + window.location.search;
+        window.location.href = `/account/auth/login?redirect=${encodeURIComponent(redirect)}`;
+      } catch {
+        window.location.href = "/account/auth/login";
+      }
+    };
+
+    const fetchEcoSso = async () => {
+      const r = await fetch(`/api/drive/sso?orgId=${encodeURIComponent(String(orgId))}`, {
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      if (r.status === 401) {
+        redirectToLogin();
+        return null;
+      }
+      if (!r.ok) return null;
+      return r.json();
+    };
+
+    const payload = await fetchEcoSso();
+    if (!payload) {
+      // One quick retry for transient failures.
+      try {
+        await new Promise((res) => setTimeout(res, 250));
+        const retryPayload = await fetchEcoSso();
+        if (retryPayload) authStore.setEcoSsoSession(retryPayload);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
     authStore.setEcoSsoSession(payload);
   } catch {
     // Ignore: user may be visiting CloudPaste directly or not logged in on eco-guide.

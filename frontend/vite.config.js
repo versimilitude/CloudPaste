@@ -14,7 +14,8 @@ export default defineConfig(({ command, mode }) => {
   // 统一版本管理
   const APP_VERSION = "1.9.1";
   const isDev = command === "serve";
-  const enablePwa = command === "build";
+  // Disable PWA by default for eco-drive reverse-proxy mode to avoid ServiceWorker cache issues with auth.
+  const enablePwa = command === "build" && (env.VITE_ENABLE_PWA === "1" || env.VITE_ENABLE_PWA === "true");
 
   // 打印构建信息（仅在显式开启时）
   if (env.VITE_PRINT_BUILD_INFO === "1" || env.VITE_PRINT_BUILD_INFO === "true") {
