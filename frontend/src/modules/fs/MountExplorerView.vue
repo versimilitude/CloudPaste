@@ -1,5 +1,5 @@
 <template>
-  <div class="mount-explorer-container mx-auto px-3 sm:px-6 flex-1 flex flex-col pt-6 sm:pt-8 w-full max-w-full sm:max-w-6xl">
+  <div class="mount-explorer-container mx-auto px-3 sm:px-6 flex-1 flex flex-col pt-[15px] w-full max-w-none">
 
     <!-- æéç®¡çç»ä»¶ -->
     <PermissionManager
@@ -14,11 +14,19 @@
     <!-- ä¸»è¦åå®¹åºå -->
     <div v-if="hasPermission" class="mount-explorer-main">
       <!-- é¡¶é¨ READMEï¼ä»ç®å½è§å¾æ¾ç¤ºï¼?-->
-      <DirectoryReadme v-if="!showFilePreview" position="top" :meta="directoryMeta" :dark-mode="darkMode" />
 
       <!-- æä½æé® -->
-      <div v-if="!showFilePreview" class="mb-4">
-        <div class="px-1">
+      <div v-if="!showFilePreview" class="mount-toolbar flex items-center justify-between gap-3 mb-3">
+        <BreadcrumbNav
+          :current-path="currentViewPath"
+          :dark-mode="darkMode"
+          @navigate="handleNavigate"
+          @prefetch="handlePrefetch"
+          :basic-path="effectiveBasicPath"
+          :user-type="isAdmin ? 'admin' : 'user'"
+        />
+
+        <div class="shrink-0">
           <FileOperations
             :current-path="currentPath"
             :is-virtual="isVirtualDirectory"
@@ -40,6 +48,8 @@
       </div>
 
       <!-- ä¸ä¼ å¼¹çª -->
+      <DirectoryReadme v-if="!showFilePreview" position="top" :meta="directoryMeta" :dark-mode="darkMode" />
+
       <UppyUploadModal
         v-if="hasEverOpenedUploadModal"
         :is-open="isUploadModalOpen"
@@ -153,24 +163,25 @@
 
 
       <!-- é¢åå±å¯¼è?-->
-       <div class="mb-4">
-          <BreadcrumbNav
-           :current-path="currentViewPath"
-           :dark-mode="darkMode"
-           @navigate="handleNavigate"
-           @prefetch="handlePrefetch"
-           :basic-path="effectiveBasicPath"
-           :user-type="isAdmin ? 'admin' : 'user'"
-         />
-       </div>
+
 
       <!-- åå®¹åºå - æ ¹æ®æ¨¡å¼æ¾ç¤ºæä»¶åè¡¨ææä»¶é¢è§?-->
       <div class="mount-content bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
         <Transition name="fade-slide" mode="out-in" @before-enter="handleContentBeforeEnter">
           <!-- æä»¶åè¡¨æ¨¡å¼ -->
-          <div v-if="!showFilePreview" key="list">
+          <div v-if="!showFilePreview" key="list" class="flex">
             <!-- ååµå¼å¯ç éªè¯?-->
-            <PathPasswordDialog
+            <DriveSidebar
+              :root-path="effectiveBasicPath"
+              :root-label="driveRootLabel"
+              :current-path="currentViewPath"
+              :dark-mode="darkMode"
+              @navigate="handleNavigate"
+              @prefetch="handlePrefetch"
+            />
+
+            <div class="flex-1 min-w-0 p-4">
+              <PathPasswordDialog
               v-if="pathPassword.showPasswordDialog.value"
               :is-open="pathPassword.showPasswordDialog.value"
               :path="pathPassword.pendingPath.value || currentPath"
@@ -245,6 +256,7 @@
                 />
               </div>
             </template>
+            </div>
           </div>
 
           <!-- æä»¶é¢è§æ¨¡å¼ -->
@@ -389,6 +401,7 @@ import { useMountExplorerController } from "./useMountExplorerController.js";
 
 // å­ç»ä»?
 import BreadcrumbNav from "@/modules/fs/components/shared/BreadcrumbNav.vue";
+import DriveSidebar from "@/modules/fs/components/shared/DriveSidebar.vue";
 import DirectoryList from "@/modules/fs/components/directory/DirectoryList.vue";
 import DirectoryReadme from "@/modules/fs/components/DirectoryReadme.vue";
 import FileOperations from "@/modules/fs/components/shared/FileOperations.vue";
@@ -485,6 +498,8 @@ const effectiveBasicPath = computed(() => {
   const orgId = authStore.ecoOrgId;
   return orgId ? `/drive/org/${orgId}` : "/";
 });
+
+const driveRootLabel = computed(() => authStore.ecoOrgName || authStore.userInfo?.name || "网盘");
 
 // ===== ä»âç¬¬ä¸æ¬¡æå¼âæ¶æå è½½éå¼¹çªç»ä»¶ =====
 const hasEverOpenedUploadModal = ref(false);

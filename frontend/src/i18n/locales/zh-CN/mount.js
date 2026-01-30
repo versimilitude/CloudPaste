@@ -17,6 +17,7 @@ export default {
       deleting: "删除中...",
     },
     operations: {
+      actions: "操作",
       upload: "上传",
       createFolder: "新建文件夹",
       refresh: "刷新",

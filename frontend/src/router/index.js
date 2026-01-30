@@ -747,7 +747,7 @@ router.afterEach(async (to, from) => {
         break;
       case "MountExplorer":
       case "MountExplorerPath":
-        title = `${t("pageTitle.mountExplorerSubtitle")} - ${siteTitle}`;
+        title = `${t("pageTitle.mountExplorerSubtitle")}-${siteTitle}`;
         break;
       case "NotFound":
         title = `${t("pageTitle.notFoundSubtitle")} - ${siteTitle}`;

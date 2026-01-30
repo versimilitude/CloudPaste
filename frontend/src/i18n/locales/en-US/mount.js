@@ -17,6 +17,7 @@ export default {
       deleting: "Deleting...",
     },
     operations: {
+      actions: "Actions",
       upload: "Upload",
       createFolder: "New Folder",
       refresh: "Refresh",

@@ -1,5 +1,5 @@
 <template>
-  <nav class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2 sm:gap-0" :aria-label="$t('breadcrumb.navigation')">
+  <nav class="flex items-center flex-wrap gap-1" :aria-label="$t('breadcrumb.navigation')">
     <!-- 左侧面包屑 -->
     <ol class="flex flex-wrap items-center gap-1">
       <li class="flex items-center">
@@ -11,7 +11,7 @@
         >
           <!-- 根目录图标 -->
           <IconHome size="sm" class="mr-1.5" aria-hidden="true" />
-          <span class="text-base font-medium">{{ $t("breadcrumb.root") }}</span>
+          <span class="text-xs font-medium">{{ $t("breadcrumb.root") }}</span>
         </a>
       </li>
 
@@ -22,7 +22,7 @@
         
         <span
           v-if="index === pathSegments.length - 1"
-          :class="['px-2 py-1.5 rounded-md text-base font-semibold', darkMode ? 'text-gray-100 bg-gray-800/50' : 'text-gray-900 bg-gray-100']"
+          :class="['px-2 py-1.5 rounded-md text-xs font-semibold', darkMode ? 'text-gray-100 bg-gray-800/50' : 'text-gray-900 bg-gray-100']"
         >
           {{ segment }}
         </span>
@@ -32,7 +32,7 @@
           @click.prevent="navigateToSegment(index)"
           @mouseenter="prefetchSegment(index)"
           :class="[
-            'px-2 py-1.5 rounded-md text-base font-medium transition-colors duration-200',
+            'px-2 py-1.5 rounded-md text-xs font-medium transition-colors duration-200',
             darkMode ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100',
           ]"
         >

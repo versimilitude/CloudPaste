@@ -102,7 +102,7 @@ export default {
     uploadSubtitle: "文件上传",
     pasteViewSubtitle: "查看分享",
     fileViewSubtitle: "文件预览",
-    mountExplorerSubtitle: "挂载浏览",
+    mountExplorerSubtitle: "网盘",
     notFoundSubtitle: "页面未找到",
     // 管理模块标题
     adminModules: {
