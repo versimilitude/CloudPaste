@@ -181,7 +181,18 @@ const nodes = reactive(new Map());
 const ensureNode = (path) => {
   const p = normalizeFsPath(path);
   if (!nodes.has(p)) {
-    nodes.set(p, { path: p, name: p.split("/").filter(Boolean).slice(-1)[0] || p, loading: false, error: null, expanded: false, children: [] });
+    // Ensure the node object itself is reactive so updates (create/rename/delete) reflect immediately in the tree.
+    nodes.set(
+      p,
+      reactive({
+        path: p,
+        name: p.split("/").filter(Boolean).slice(-1)[0] || p,
+        loading: false,
+        error: null,
+        expanded: false,
+        children: [],
+      })
+    );
   }
   return nodes.get(p);
 };

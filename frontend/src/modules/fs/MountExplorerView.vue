@@ -15,38 +15,6 @@
     <div v-if="hasPermission" class="mount-explorer-main">
       <!-- é¡¶é¨ READMEï¼ä»ç®å½è§å¾æ¾ç¤ºï¼?-->
 
-      <!-- æä½æé® -->
-      <div v-if="!showFilePreview" class="mount-toolbar flex items-center justify-between gap-3 mb-3">
-        <BreadcrumbNav
-          :current-path="currentViewPath"
-          :dark-mode="darkMode"
-          @navigate="handleNavigate"
-          @prefetch="handlePrefetch"
-          :basic-path="effectiveBasicPath"
-          :user-type="isAdmin ? 'admin' : 'user'"
-        />
-
-        <div class="shrink-0">
-          <FileOperations
-            :current-path="currentPath"
-            :is-virtual="isVirtualDirectory"
-            :dark-mode="darkMode"
-            :view-mode="viewMode"
-            :selected-items="selectedItems"
-            @create-folder="handleCreateFolder"
-            @refresh="handleRefresh"
-            @change-view-mode="handleViewModeChange"
-            @openUploadModal="handleOpenUploadModal"
-            @openCopyModal="handleBatchCopy"
-            @openTasksModal="handleOpenTasksModal"
-            @openSearchModal="handleOpenSearchModal"
-            @openSettingsDrawer="handleOpenSettingsDrawer"
-            @task-created="handleTaskCreated"
-            @show-message="handleShowMessage"
-          />
-        </div>
-      </div>
-
       <!-- ä¸ä¼ å¼¹çª -->
       <DirectoryReadme v-if="!showFilePreview" position="top" :meta="directoryMeta" :dark-mode="darkMode" />
 
@@ -167,6 +135,41 @@
 
       <!-- åå®¹åºå - æ ¹æ®æ¨¡å¼æ¾ç¤ºæä»¶åè¡¨ææä»¶é¢è§?-->
       <div class="mount-content bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
+        <!-- Windows 风格：把地址栏/操作栏放到文件区域内部顶部 -->
+        <div
+          v-if="!showFilePreview"
+          class="mount-toolbar flex items-center justify-between gap-3 px-4 pt-3 pb-2 border-b"
+          :class="darkMode ? 'border-gray-700' : 'border-gray-200'"
+        >
+          <BreadcrumbNav
+            :current-path="currentViewPath"
+            :dark-mode="darkMode"
+            @navigate="handleNavigate"
+            @prefetch="handlePrefetch"
+            :basic-path="effectiveBasicPath"
+            :user-type="breadcrumbUserType"
+          />
+
+          <div class="shrink-0">
+            <FileOperations
+              :current-path="currentPath"
+              :is-virtual="isVirtualDirectory"
+              :dark-mode="darkMode"
+              :view-mode="viewMode"
+              :selected-items="selectedItems"
+              @create-folder="handleCreateFolder"
+              @refresh="handleRefresh"
+              @change-view-mode="handleViewModeChange"
+              @openUploadModal="handleOpenUploadModal"
+              @openCopyModal="handleBatchCopy"
+              @openTasksModal="handleOpenTasksModal"
+              @openSearchModal="handleOpenSearchModal"
+              @openSettingsDrawer="handleOpenSettingsDrawer"
+              @task-created="handleTaskCreated"
+              @show-message="handleShowMessage"
+            />
+          </div>
+        </div>
         <Transition name="fade-slide" mode="out-in" @before-enter="handleContentBeforeEnter">
           <!-- æä»¶åè¡¨æ¨¡å¼ -->
           <div v-if="!showFilePreview" key="list" class="flex">
@@ -501,6 +504,10 @@ const effectiveBasicPath = computed(() => {
 });
 
 const driveRootLabel = computed(() => authStore.ecoOrgName || authStore.userInfo?.name || "网盘");
+
+// In eco-drive mode, always treat the user as restricted (cannot browse above basicPath),
+// even if the account also has admin capabilities in CloudPaste.
+const breadcrumbUserType = computed(() => (authStore.ecoOrgId ? "user" : isAdmin.value ? "admin" : "user"));
 
 // ===== ä»âç¬¬ä¸æ¬¡æå¼âæ¶æå è½½éå¼¹çªç»ä»¶ =====
 const hasEverOpenedUploadModal = ref(false);
@@ -855,6 +862,17 @@ const handleSearchItemClick = async (item) => {
 const handleNavigate = async (path) => {
   // é¢åå±?è¿åä¸çº§å±äºâåéå¯¼èªâï¼
   // - ä¼åä¿çç®æ ç®å½ç?history å¿«ç§
+  // Eco-drive: hard guard against navigating above the org root.
+  if (authStore.ecoOrgId) {
+    const base = normalizeFsPath(effectiveBasicPath.value || "/");
+    const target = normalizeFsPath(path || "/");
+    if (base !== "/" && !(target === base || target.startsWith(`${base}/`))) {
+      showMessage("warning", t("mount.noPermissionForPath", { path: base }));
+      await navigateToPreserveHistory(base);
+      return;
+    }
+  }
+
   if (isSameOrSubPath(path, currentViewPath.value)) {
     await navigateToPreserveHistory(path);
     return;

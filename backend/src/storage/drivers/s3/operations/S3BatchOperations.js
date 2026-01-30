@@ -547,7 +547,19 @@ export class S3BatchOperations {
           await this.s3Client.send(deleteCommand);
         }
 
-        await updateParentDirectoriesModifiedTime(this.s3Client, bucketName, fullOldS3Path, this.config.root_prefix);
+        // 目录重命名时，fullOldS3Path 以 / 结尾，会被 updateParentDirectoriesModifiedTime 当作“目录 key”去 touch，
+        // 从而把刚删除的旧目录 marker 重新创建出来，导致前端看到“重命名后旧目录仍存在（空目录）”。
+        // 因此这里仅更新父目录时间，并且跳过缺失目录（避免重建已删除目录）。
+        const oldTouchKey = oldIsDirectory
+          ? fullOldS3Path.replace(/[^/]+\/$/, "")
+          : fullOldS3Path;
+        await updateParentDirectoriesModifiedTime(this.s3Client, bucketName, oldTouchKey, this.config.root_prefix, true);
+
+        // 同时 touch 新路径所在父目录，确保 UI 侧能及时看到更新（同样避免创建缺失目录）。
+        const newTouchKey = newIsDirectory
+          ? fullNewS3Path.replace(/[^/]+\/$/, "")
+          : fullNewS3Path;
+        await updateParentDirectoriesModifiedTime(this.s3Client, bucketName, newTouchKey, this.config.root_prefix, true);
 
         if (db && mount?.id) {
           await updateMountLastUsed(db, mount.id);
