@@ -15,8 +15,7 @@ local_protocol = "http"
 # 环境变量
 [vars]
 ENCRYPTION_SECRET = "default-encryption-key"
-# 用于加密敏感配置的密钥
-ENCRYPTION_SECRET = "default-encryption-key"
+# 用于加密敏感配置的密钥（建议在 Cloudflare Workers 里用 Secret 覆盖 ENCRYPTION_SECRET）
 # 管理员Token过期天数，默认7天
 ADMIN_TOKEN_EXPIRY_DAYS = "7"
 #
