@@ -63,6 +63,43 @@ async function ensureDbReadyOnce(env) {
 
 export default {
   async fetch(request, env, ctx) {
+    // Optional: close direct access to workers.dev (only allow reverse proxy requests).
+    const proxySecret = String(env?.ECO_PROXY_SECRET || "");
+    if (proxySecret) {
+      const got = request.headers.get("X-Eco-Proxy-Secret") || "";
+      if (got !== proxySecret) {
+        return new Response("Forbidden", { status: 403 });
+      }
+    }
+
+    // Support being mounted under /drive/*: strip the prefix before routing to assets / API.
+    let effectiveRequest = request;
+    try {
+      const u = new URL(request.url);
+      if (u.pathname === "/drive") u.pathname = "/";
+      else if (u.pathname.startsWith("/drive/")) u.pathname = u.pathname.slice("/drive".length);
+      if (u.pathname !== new URL(request.url).pathname) {
+        effectiveRequest = new Request(u.toString(), request);
+      }
+    } catch {
+      // ignore
+    }
+
+    // Non-API requests should be served by static assets (avoid DB init per asset).
+    try {
+      const p = new URL(effectiveRequest.url).pathname;
+      const isApiOrDav =
+        p === "/api" ||
+        p.startsWith("/api/") ||
+        p === "/dav" ||
+        p.startsWith("/dav/");
+      if (!isApiOrDav && env?.ASSETS?.fetch) {
+        return env.ASSETS.fetch(effectiveRequest);
+      }
+    } catch {
+      // ignore
+    }
+
     try {
       if (!env || !env.ENCRYPTION_SECRET) {
         throw new Error("ENCRYPTION_SECRET 未配置，请在Cloudflare绑定中设置安全密钥");
@@ -76,7 +113,7 @@ export default {
 
       await ensureDbReadyOnce(env);
 
-      return app.fetch(request, bindings, ctx);
+      return app.fetch(effectiveRequest, bindings, ctx);
     } catch (error) {
       console.error("处理请求时发生错误:", error);
       return new Response(

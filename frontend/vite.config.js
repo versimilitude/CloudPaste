@@ -45,7 +45,8 @@ export default defineConfig(({ command, mode }) => {
   });
 
   return {
-    base: '/',
+    // Served under eco-guide's /drive reverse proxy (same origin).
+    base: "/drive/",
     define: {
       __APP_VERSION__: JSON.stringify(APP_VERSION),
       __APP_ENV__: JSON.stringify(env.VITE_APP_ENV || "production"),
@@ -80,10 +81,17 @@ export default defineConfig(({ command, mode }) => {
           clientsClaim: true,
           cleanupOutdatedCaches: true,
           navigateFallback: "index.html",
-          navigateFallbackAllowlist: [/^\/$/, /^\/upload$/, /^\/admin/, /^\/paste\/.+/, /^\/file\/.+/, /^\/mount-explorer/],
+          navigateFallbackAllowlist: [
+            /^\/drive\/$/,
+            /^\/drive\/upload$/,
+            /^\/drive\/admin/,
+            /^\/drive\/paste\/.+/,
+            /^\/drive\/file\/.+/,
+            /^\/drive\/mount-explorer/,
+          ],
 
           // 集成自定义Service Worker代码以支持Background Sync API
-          importScripts: ["/sw-background-sync.js"],
+          importScripts: ["/drive/sw-background-sync.js"],
 
           // PWA缓存策略
           runtimeCaching: [

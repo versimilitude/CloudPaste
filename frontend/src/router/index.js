@@ -321,7 +321,8 @@ const routes = [
 
 // 创建路由实例
 const router = createRouter({
-  history: createWebHistory(),
+  // When deployed behind eco-guide reverse proxy, CloudPaste runs under /drive/.
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes,
   scrollBehavior(to, from, savedPosition) {
     // MountExplorer 的滚动由页面自身管理（用于“预览 ↔ 列表”保持原位/恢复）

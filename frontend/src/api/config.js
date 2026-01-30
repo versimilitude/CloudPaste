@@ -69,6 +69,11 @@ export const getFullApiUrl = (endpoint) => {
   // 确保endpoint以/开头
   const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
 
+  // 如果调用方已经带了 /api 前缀（历史代码），避免重复拼接成 /api/api/...
+  if (normalizedEndpoint === API_PREFIX || normalizedEndpoint.startsWith(`${API_PREFIX}/`)) {
+    return `${API_BASE_URL}${normalizedEndpoint}`;
+  }
+
   // 添加API前缀
   return `${API_BASE_URL}${API_PREFIX}${normalizedEndpoint}`;
 };
