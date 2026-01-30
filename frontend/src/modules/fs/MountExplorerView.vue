@@ -1,7 +1,7 @@
 <template>
   <div class="mount-explorer-container mx-auto px-3 sm:px-6 flex-1 flex flex-col pt-6 sm:pt-8 w-full max-w-full sm:max-w-6xl">
 
-    <!-- 权限管理组件 -->
+    <!-- æéç®¡çç»ä»¶ -->
     <PermissionManager
       :dark-mode="darkMode"
       permission-type="mount"
@@ -11,12 +11,12 @@
       @navigate-to-admin="navigateToAdmin"
     />
 
-    <!-- 主要内容区域 -->
+    <!-- ä¸»è¦åå®¹åºå -->
     <div v-if="hasPermission" class="mount-explorer-main">
-      <!-- 顶部 README（仅目录视图显示�?-->
+      <!-- é¡¶é¨ READMEï¼ä»ç®å½è§å¾æ¾ç¤ºï¼?-->
       <DirectoryReadme v-if="!showFilePreview" position="top" :meta="directoryMeta" :dark-mode="darkMode" />
 
-      <!-- 操作按钮 -->
+      <!-- æä½æé® -->
       <div v-if="!showFilePreview" class="mb-4">
         <div class="px-1">
           <FileOperations
@@ -39,7 +39,7 @@
         </div>
       </div>
 
-      <!-- 上传弹窗 -->
+      <!-- ä¸ä¼ å¼¹çª -->
       <UppyUploadModal
         v-if="hasEverOpenedUploadModal"
         :is-open="isUploadModalOpen"
@@ -51,7 +51,7 @@
         @upload-error="handleUploadError"
       />
 
-      <!-- 复制弹窗 -->
+      <!-- å¤å¶å¼¹çª -->
       <CopyModal
         v-if="hasEverOpenedCopyModal"
         :is-open="isCopyModalOpen"
@@ -64,7 +64,7 @@
         @copy-started="handleCopyStarted"
       />
 
-      <!-- 任务列表弹窗 -->
+      <!-- ä»»å¡åè¡¨å¼¹çª -->
       <TaskListModal
         v-if="hasEverOpenedTasksModal"
         :is-open="isTasksModalOpen"
@@ -73,7 +73,7 @@
         @task-completed="handleTaskCompleted"
       />
 
-      <!-- 新建文件夹弹�?-->
+      <!-- æ°å»ºæä»¶å¤¹å¼¹çª?-->
       <InputDialog
         :is-open="showCreateFolderDialog"
         :title="t('mount.operations.createFolder')"
@@ -91,7 +91,7 @@
         @close="showCreateFolderDialog = false"
       />
 
-      <!-- 右键菜单重命名弹�?-->
+      <!-- å³é®èåéå½åå¼¹çª?-->
       <InputDialog
         :is-open="contextMenuRenameDialogOpen"
         :title="t('mount.rename.title')"
@@ -109,7 +109,7 @@
         @close="contextMenuRenameDialogOpen = false"
       />
 
-      <!-- 通用 ConfirmDialog 组件替换内联对话�?-->
+      <!-- éç¨ ConfirmDialog ç»ä»¶æ¿æ¢åèå¯¹è¯æ¡?-->
       <ConfirmDialog
         :is-open="showDeleteDialog"
         :title="itemsToDelete.length === 1 ? t('mount.delete.title') : t('mount.batchDelete.title')"
@@ -152,7 +152,7 @@
       </ConfirmDialog>
 
 
-      <!-- 面包屑导�?-->
+      <!-- é¢åå±å¯¼è?-->
       <div class="mb-4">
           <BreadcrumbNav
           :current-path="currentViewPath"
@@ -164,12 +164,12 @@
         />
       </div>
 
-      <!-- 内容区域 - 根据模式显示文件列表或文件预�?-->
+      <!-- åå®¹åºå - æ ¹æ®æ¨¡å¼æ¾ç¤ºæä»¶åè¡¨ææä»¶é¢è§?-->
       <div class="mount-content bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
         <Transition name="fade-slide" mode="out-in" @before-enter="handleContentBeforeEnter">
-          <!-- 文件列表模式 -->
+          <!-- æä»¶åè¡¨æ¨¡å¼ -->
           <div v-if="!showFilePreview" key="list">
-            <!-- 内嵌式密码验�?-->
+            <!-- ååµå¼å¯ç éªè¯?-->
             <PathPasswordDialog
               v-if="pathPassword.showPasswordDialog.value"
               :is-open="pathPassword.showPasswordDialog.value"
@@ -183,7 +183,7 @@
             />
 
             <template v-else>
-              <!-- 非阻塞错误提示：不再�?error 直接替换整个列表区域 -->
+              <!-- éé»å¡éè¯¯æç¤ºï¼ä¸åç?error ç´æ¥æ¿æ¢æ´ä¸ªåè¡¨åºå -->
               <div v-if="error" class="mb-4 p-4 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
                 <div class="flex items-start justify-between gap-3">
                   <div class="flex items-start">
@@ -212,7 +212,7 @@
                 </div>
               </div>
 
-              <!-- 目录列表 -->
+              <!-- ç®å½åè¡¨ -->
               <div class="min-h-[400px]">
                 <DirectoryList
                   ref="directoryListRef"
@@ -247,9 +247,9 @@
             </template>
           </div>
 
-          <!-- 文件预览模式 -->
+          <!-- æä»¶é¢è§æ¨¡å¼ -->
           <div v-else key="preview">
-            <!-- 预览加载状�?-->
+            <!-- é¢è§å è½½ç¶æ?-->
             <div v-if="isPreviewLoading" class="p-8 text-center">
               <LoadingIndicator
                 :text="$t('common.loading')"
@@ -259,7 +259,7 @@
               />
             </div>
 
-            <!-- 预览错误状�?-->
+            <!-- é¢è§éè¯¯ç¶æ?-->
             <div v-else-if="previewError" class="p-8 text-center">
               <div class="flex flex-col items-center space-y-4">
                 <IconExclamation size="3xl" class="w-12 h-12 text-red-500" aria-hidden="true" />
@@ -272,9 +272,9 @@
               </div>
             </div>
 
-            <!-- 预览内容 -->
+            <!-- é¢è§åå®¹ -->
             <div v-else-if="previewFile || previewInfo" class="p-4">
-              <!-- 返回按钮 -->
+              <!-- è¿åæé® -->
               <div class="mb-4">
                 <button
                   @click="closePreviewWithUrl"
@@ -286,7 +286,7 @@
                 </button>
               </div>
 
-              <!-- 文件预览内容 -->
+              <!-- æä»¶é¢è§åå®¹ -->
               <FilePreview
                 :file="previewInfo || previewFile"
                 :dark-mode="darkMode"
@@ -305,11 +305,11 @@
         </Transition>
       </div>
 
-      <!-- 底部 README -->
+      <!-- åºé¨ README -->
       <DirectoryReadme v-if="!showFilePreview" position="bottom" :meta="directoryMeta" :dark-mode="darkMode" />
     </div>
 
-    <!-- 搜索弹窗 -->
+    <!-- æç´¢å¼¹çª -->
     <SearchModal
       v-if="hasEverOpenedSearchModal"
       :is-open="isSearchModalOpen"
@@ -320,7 +320,7 @@
       @item-click="handleSearchItemClick"
     />
 
-    <!-- 设置抽屉 -->
+    <!-- è®¾ç½®æ½å± -->
     <SettingsDrawer
       v-if="hasEverOpenedSettingsDrawer"
       :is-open="isSettingsDrawerOpen"
@@ -328,10 +328,10 @@
       @close="handleCloseSettingsDrawer"
     />
 
-    <!-- FS 媒体查看器（Lightbox Shell�?-->
+    <!-- FS åªä½æ¥çå¨ï¼Lightbox Shellï¼?-->
     <FsMediaLightboxDialog v-if="hasEverOpenedLightbox" />
 
-    <!-- 悬浮操作�?(当有选中项时显示) -->
+    <!-- æ¬æµ®æä½æ ?(å½æéä¸­é¡¹æ¶æ¾ç¤º) -->
     <FloatingActionBar
       v-if="hasPermission && selectedCount > 0"
       :selected-count="selectedCount"
@@ -345,7 +345,7 @@
       @clear-selection="handleClearSelection"
     />
 
-    <!-- 浮动工具�?(右下角快捷操�? -->
+    <!-- æµ®å¨å·¥å·æ ?(å³ä¸è§å¿«æ·æä½? -->
     <FloatingToolbar
       v-if="hasPermission"
       :dark-mode="darkMode"
@@ -360,7 +360,7 @@
       @settings="handleOpenSettingsDrawer"
     />
 
-    <!-- 返回顶部按钮 -->
+    <!-- è¿åé¡¶é¨æé® -->
     <BackToTop :dark-mode="darkMode" />
   </div>
 </template>
@@ -374,8 +374,8 @@ import { useThemeMode } from "@/composables/core/useThemeMode.js";
 import { IconBack, IconExclamation, IconSearch, IconSettings, IconXCircle } from "@/components/icons";
 import LoadingIndicator from "@/components/common/LoadingIndicator.vue";
 
-// 组合式函�?- 使用统一聚合导出
-// 按需从具体文件导�?
+// ç»åå¼å½æ?- ä½¿ç¨ç»ä¸èåå¯¼åº
+// æéä»å·ä½æä»¶å¯¼å?
 import { useSelection } from "@/composables/ui-interaction/useSelection.js";
 import { useUIState } from "@/composables/ui-interaction/useUIState.js";
 import { useFileBasket } from "@/composables/file-system/useFileBasket.js";
@@ -383,15 +383,15 @@ import { useFileOperations } from "@/composables/file-system/useFileOperations.j
 import { usePathPassword } from "@/composables/usePathPassword.js";
 import { useContextMenu } from "@/composables/useContextMenu.js";
 
-// 视图控制�?
+// è§å¾æ§å¶å?
 import { useMountExplorerController } from "./useMountExplorerController.js";
 
-// 子组�?
+// å­ç»ä»?
 import BreadcrumbNav from "@/modules/fs/components/shared/BreadcrumbNav.vue";
 import DirectoryList from "@/modules/fs/components/directory/DirectoryList.vue";
 import DirectoryReadme from "@/modules/fs/components/DirectoryReadme.vue";
 import FileOperations from "@/modules/fs/components/shared/FileOperations.vue";
-// （Uppy、Office、EPUB、视频播放器等）按需加载
+// ï¼UppyãOfficeãEPUBãè§é¢æ­æ¾å¨ç­ï¼æéå è½½
 const FilePreview = defineAsyncComponent(() => import("@/modules/fs/components/preview/FilePreview.vue"));
 const UppyUploadModal = defineAsyncComponent(() => import("@/modules/fs/components/shared/modals/UppyUploadModal.vue"));
 const CopyModal = defineAsyncComponent(() => import("@/modules/fs/components/shared/modals/CopyModal.vue"));
@@ -416,23 +416,23 @@ const log = createLogger("MountExplorerView");
 
 const validateFsItemNameDialog = createFsItemNameDialogValidator(t);
 
-// 使用组合式函�?
+// ä½¿ç¨ç»åå¼å½æ?
 const selection = useSelection();
 const fileOperations = useFileOperations();
 const uiState = useUIState();
 const fileBasket = useFileBasket();
 const pathPassword = usePathPassword();
 
-// 右键菜单 - 延迟初始�?
+// å³é®èå - å»¶è¿åå§å?
 let contextMenu = null;
 
-// Lightbox（模块内单例�?
+// Lightboxï¼æ¨¡åååä¾ï¼?
 const fsLightbox = useFsMediaLightbox();
 
-// 文件篮状�?
+// æä»¶ç¯®ç¶æ?
 const { isBasketOpen } = storeToRefs(fileBasket);
 
-// 控制器：封装路由 / 权限 / 目录加载与预览初始化
+// æ§å¶å¨ï¼å°è£è·¯ç± / æé / ç®å½å è½½ä¸é¢è§åå§å
 const {
   currentPath,
   currentViewPath,
@@ -472,7 +472,7 @@ const {
 
 const { y: windowScrollY } = useWindowScroll();
 
-// ===== 仅“第一次打开”时才加载重弹窗组件 =====
+// ===== ä»âç¬¬ä¸æ¬¡æå¼âæ¶æå è½½éå¼¹çªç»ä»¶ =====
 const hasEverOpenedUploadModal = ref(false);
 const hasEverOpenedCopyModal = ref(false);
 const hasEverOpenedTasksModal = ref(false);
@@ -482,28 +482,28 @@ const hasEverOpenedLightbox = ref(false);
 
 const scheduleWindowScrollTo = (top) => {
   if (typeof window === "undefined") return;
-  // 等列�?DOM 插入并完成一次布局后再滚动
+  // ç­åè¡?DOM æå¥å¹¶å®æä¸æ¬¡å¸å±ååæ»å¨
   if (typeof requestAnimationFrame === "function") {
     requestAnimationFrame(() => {
       windowScrollY.value = top;
     });
     return;
   }
-  // 降级：极端环境无 rAF
+  // éçº§ï¼æç«¯ç¯å¢æ  rAF
   setTimeout(() => {
     windowScrollY.value = top;
   }, 0);
 };
 
-// 解决你说的“先下→到顶→再下”抖动：把滚动设置统一收口�?Transition 的进入阶段，只执行一�?
+// è§£å³ä½ è¯´çâåä¸âå°é¡¶âåä¸âæå¨ï¼ææ»å¨è®¾ç½®ç»ä¸æ¶å£å?Transition çè¿å¥é¶æ®µï¼åªæ§è¡ä¸æ¬?
 const handleContentBeforeEnter = () => {
-  // 进入预览：默认回到顶�?
+  // è¿å¥é¢è§ï¼é»è®¤åå°é¡¶é?
   if (showFilePreview.value) {
     scheduleWindowScrollTo(0);
     return;
   }
 
-  // 回到列表：如�?controller 有“待恢复的滚动值”，在列表真正进入前先设置好
+  // åå°åè¡¨ï¼å¦æ?controller æâå¾æ¢å¤çæ»å¨å¼âï¼å¨åè¡¨çæ­£è¿å¥ååè®¾ç½®å¥½
   if (typeof consumePendingScrollRestore === "function") {
     const value = consumePendingScrollRestore();
     if (typeof value === "number") {
@@ -512,7 +512,7 @@ const handleContentBeforeEnter = () => {
   }
 };
 
-// 根据目录 Meta 的隐藏规则计算实际可见条�?
+// æ ¹æ®ç®å½ Meta çéèè§åè®¡ç®å®éå¯è§æ¡ç?
 const visibleItems = computed(() => {
   const items = directoryItems.value || [];
   const meta = directoryMeta.value;
@@ -541,11 +541,11 @@ const visibleItems = computed(() => {
 
 const { selectedItems, selectedCount, setAvailableItems, toggleSelectAll, getSelectedItems, selectItem, clearSelection } = selection;
 
-// 组合式函数状态和方法
+// ç»åå¼å½æ°ç¶æåæ¹æ³
 const {
-  // 消息管理
+  // æ¶æ¯ç®¡ç
   showMessage,
-  // 弹窗状态管�?
+  // å¼¹çªç¶æç®¡ç?
   isUploadModalOpen,
   isCopyModalOpen,
   isTasksModalOpen,
@@ -565,26 +565,26 @@ const showDeleteDialog = ref(false);
 const itemsToDelete = ref([]);
 const isDeleting = ref(false);
 
-// 右键菜单相关状�?
+// å³é®èåç¸å³ç¶æ?
 const contextMenuRenameItem = ref(null);
 const contextMenuRenameDialogOpen = ref(false);
-const isRenaming = ref(false); // 重命名操作的 loading 状�?
+const isRenaming = ref(false); // éå½åæä½ç loading ç¶æ?
 const contextMenuCopyItems = ref([]);
-// 右键菜单高亮的项目路径（临时高亮，不是勾选选中�?
+// å³é®èåé«äº®çé¡¹ç®è·¯å¾ï¼ä¸´æ¶é«äº®ï¼ä¸æ¯å¾ééä¸­ï¼?
 const contextHighlightPath = ref(null);
-// DirectoryList 组件引用
+// DirectoryList ç»ä»¶å¼ç¨
 const directoryListRef = ref(null);
-// DirectoryList 重命名操作的 loading 状�?
+// DirectoryList éå½åæä½ç loading ç¶æ?
 const isDirectoryListRenaming = ref(false);
 
-// 新建文件夹弹窗状�?
+// æ°å»ºæä»¶å¤¹å¼¹çªç¶æ?
 const showCreateFolderDialog = ref(false);
 const isCreatingFolder = ref(false);
 
-// 设置抽屉状�?
+// è®¾ç½®æ½å±ç¶æ?
 const isSettingsDrawerOpen = ref(false);
 
-// ===== 仅“第一次打开”时才加载重弹窗组件（watch 需要在依赖变量定义之后注册�?=====
+// ===== ä»âç¬¬ä¸æ¬¡æå¼âæ¶æå è½½éå¼¹çªç»ä»¶ï¼watch éè¦å¨ä¾èµåéå®ä¹ä¹åæ³¨åï¼?=====
 watch(
   () => isUploadModalOpen.value,
   (open) => {
@@ -622,14 +622,14 @@ watch(
   }
 );
 
-// 初始化用户配�?
+// åå§åç¨æ·éç½?
 const explorerSettings = useExplorerSettings();
 
-// �?explorerSettings 获取视图模式
+// ä»?explorerSettings è·åè§å¾æ¨¡å¼
 const viewMode = computed(() => explorerSettings.settings.viewMode);
 const setViewMode = (mode) => explorerSettings.setViewMode(mode);
 
-// 复制弹窗使用的项目列表：优先使用右键菜单选中的项目，否则使用勾选的项目
+// å¤å¶å¼¹çªä½¿ç¨çé¡¹ç®åè¡¨ï¼ä¼åä½¿ç¨å³é®èåéä¸­çé¡¹ç®ï¼å¦åä½¿ç¨å¾éçé¡¹ç®
 const copyModalItems = computed(() => {
   if (contextMenuCopyItems.value.length > 0) {
     return contextMenuCopyItems.value;
@@ -637,13 +637,13 @@ const copyModalItems = computed(() => {
   return getSelectedItems();
 });
 
-// 初始化右键菜�?
+// åå§åå³é®èå?
 const initContextMenu = () => {
   contextMenu = useContextMenu({
     onDownload: handleDownload,
     onGetLink: handleGetLink,
     onRename: (item) => {
-      // 直接触发重命名，设置待重命名的项�?
+      // ç´æ¥è§¦åéå½åï¼è®¾ç½®å¾éå½åçé¡¹ç?
       contextMenuRenameItem.value = item;
       contextMenuRenameDialogOpen.value = true;
     },
@@ -656,13 +656,13 @@ const initContextMenu = () => {
       showDeleteDialog.value = true;
     },
     onCopy: (items) => {
-      // 右键菜单复制：直接使用传入的项目，而不是依�?selectedItems
+      // å³é®èåå¤å¶ï¼ç´æ¥ä½¿ç¨ä¼ å¥çé¡¹ç®ï¼èä¸æ¯ä¾èµ?selectedItems
       const itemsArray = Array.isArray(items) ? items : [items];
       if (itemsArray.length === 0) {
         showMessage("warning", t("mount.messages.noItemsSelected"));
         return;
       }
-      // 临时设置选中项目以便复制弹窗使用
+      // ä¸´æ¶è®¾ç½®éä¸­é¡¹ç®ä»¥ä¾¿å¤å¶å¼¹çªä½¿ç¨
       contextMenuCopyItems.value = itemsArray;
       openCopyModal();
     },
@@ -676,7 +676,7 @@ const initContextMenu = () => {
       }
     },
     onToggleCheckboxes: () => {
-      // 切换勾选框显示状�?
+      // åæ¢å¾éæ¡æ¾ç¤ºç¶æ?
       explorerSettings.toggleShowCheckboxes();
     },
     t,
@@ -692,31 +692,31 @@ onMounted(() => {
 const props = defineProps({
   mode: {
     type: String,
-    default: "default", // 默认模式，或 "selection"（选择模式�?
+    default: "default", // é»è®¤æ¨¡å¼ï¼æ "selection"ï¼éæ©æ¨¡å¼ï¼?
   },
 });
 
 const { isDarkMode: darkMode } = useThemeMode();
 
-// 权限变化处理
+// æéååå¤ç
 const handlePermissionChange = (hasPermission) => {
-  // 权限状态会自动更新，这里只需要记录日�?
+  // æéç¶æä¼èªå¨æ´æ°ï¼è¿éåªéè¦è®°å½æ¥å¿?
 };
 
-// API密钥信息
-// 导航到管理页�?
+// APIå¯é¥ä¿¡æ¯
+// å¯¼èªå°ç®¡çé¡µé?
 const navigateToAdmin = () => {
   import("@/router").then(({ routerUtils }) => {
     routerUtils.navigateTo("admin");
   });
 };
 
-// 搜索相关事件处理
+// æç´¢ç¸å³äºä»¶å¤ç
 const handleOpenSearchModal = () => {
   openSearchModal();
 };
 
-// 设置抽屉事件处理
+// è®¾ç½®æ½å±äºä»¶å¤ç
 const handleOpenSettingsDrawer = () => {
   isSettingsDrawerOpen.value = true;
 };
@@ -725,12 +725,12 @@ const handleCloseSettingsDrawer = () => {
   isSettingsDrawerOpen.value = false;
 };
 
-// 打开文件�?
+// æå¼æä»¶ç¯?
 const handleOpenFileBasket = () => {
   fileBasket.toggleBasket();
 };
 
-// 悬浮操作栏事件处�?
+// æ¬æµ®æä½æ äºä»¶å¤ç?
 const handleBatchDownload = async () => {
   const selectedFiles = getSelectedItems();
   for (const item of selectedFiles) {
@@ -750,7 +750,7 @@ const handleBatchGetLink = async () => {
 const handleBatchRename = () => {
   const selectedFiles = getSelectedItems();
   if (selectedFiles.length === 1) {
-    // 直接打开重命名对话框
+    // ç´æ¥æå¼éå½åå¯¹è¯æ¡
     contextMenuRenameItem.value = selectedFiles[0];
     contextMenuRenameDialogOpen.value = true;
   }
@@ -764,7 +764,7 @@ const handleCloseSearchModal = () => {
   closeSearchModal();
 };
 
-// 处理搜索结果项点�?
+// å¤çæç´¢ç»æé¡¹ç¹å?
 const handleSearchItemClick = async (item) => {
   try {
     if (!item.isDirectory) {
@@ -773,22 +773,21 @@ const handleSearchItemClick = async (item) => {
       await navigateTo(item.path);
     }
 
-    // 关闭搜索模态框
+    // å³é­æç´¢æ¨¡ææ¡
     closeSearchModal();
   } catch (error) {
-    log.error("搜索结果导航失败:", error);
-    showMessage("error", "导航失败: " + error.message);
+    log.error("æç´¢ç»æå¯¼èªå¤±è´¥:", error);    showMessage("error", "???????????");
   }
 };
 
-// ===== MountExplorerMain的所有方�?=====
+// ===== MountExplorerMainçæææ¹æ³?=====
 
 /**
- * 处理导航
+ * å¤çå¯¼èª
  */
 const handleNavigate = async (path) => {
-  // 面包�?返回上级属于“回退导航”：
-  // - 优先保留目标目录�?history 快照
+  // é¢åå±?è¿åä¸çº§å±äºâåéå¯¼èªâï¼
+  // - ä¼åä¿çç®æ ç®å½ç?history å¿«ç§
   if (isSameOrSubPath(path, currentViewPath.value)) {
     await navigateToPreserveHistory(path);
     return;
@@ -802,71 +801,71 @@ const handlePrefetch = (path) => {
 };
 
 /**
- * 处理刷新
+ * å¤çå·æ°
  */
 const handleRefresh = async () => {
   await refreshDirectory();
 };
 
 /**
- * 处理“加载更多”（用于上游分页的目录）
+ * å¤çâå è½½æ´å¤âï¼ç¨äºä¸æ¸¸åé¡µçç®å½ï¼
  */
 const handleLoadMore = async () => {
   await loadMoreCurrentDirectory();
 };
 
 /**
- * 处理视图模式变化
+ * å¤çè§å¾æ¨¡å¼åå
  */
 const handleViewModeChange = (newViewMode) => {
   setViewMode(newViewMode);
-  // 视图模式已通过 useExplorerSettings 自动保存�?localStorage
+  // è§å¾æ¨¡å¼å·²éè¿ useExplorerSettings èªå¨ä¿å­å?localStorage
 };
 
 /**
- * 处理文件夹创�?- 打开弹窗
+ * å¤çæä»¶å¤¹åå»?- æå¼å¼¹çª
  */
 const handleCreateFolder = () => {
   showCreateFolderDialog.value = true;
 };
 
 /**
- * 处理新建文件夹确�?
+ * å¤çæ°å»ºæä»¶å¤¹ç¡®è®?
  */
 const handleCreateFolderConfirm = async (folderName) => {
   if (!folderName) return;
 
   isCreatingFolder.value = true;
   try {
-    // 使用fileOperations创建文件夹，传递正确的参数
+    // ä½¿ç¨fileOperationsåå»ºæä»¶å¤¹ï¼ä¼ éæ­£ç¡®çåæ°
     const result = await fileOperations.createFolder(currentPath.value, folderName);
 
     if (result.success) {
       showMessage("success", result.message);
       invalidateCaches();
-      // 重新加载当前目录内容
+      // éæ°å è½½å½åç®å½åå®¹
       await refreshDirectory();
       showCreateFolderDialog.value = false;
     } else {
       showMessage("error", result.message);
     }
   } catch (error) {
-    log.error("创建文件夹失�?", error);
-    showMessage("error", "创建文件夹失败，请重�?);
+    log.error("åå»ºæä»¶å¤¹å¤±è´?", error);
+    showMessage("error", "\u521b\u5efa\u6587\u4ef6\u5939\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5");
   } finally {
     isCreatingFolder.value = false;
   }
 };
 
 /**
- * 处理新建文件夹取�?
+ * å¤çæ°å»ºæä»¶å¤¹åæ¶?
  */
 const handleCreateFolderCancel = () => {
   showCreateFolderDialog.value = false;
 };
 
 /**
- * 处理右键菜单重命名确�?
+ * å¤çå³é®èåéå½åç¡®è®?
  */
 const handleContextMenuRenameConfirm = async (newName) => {
   if (!contextMenuRenameItem.value || !newName || !newName.trim()) return;
@@ -874,7 +873,7 @@ const handleContextMenuRenameConfirm = async (newName) => {
   const nameValidation = validateFsItemName(newName);
   if (!nameValidation.valid) return;
 
-  // 设置 loading 状�?
+  // è®¾ç½® loading ç¶æ?
   isRenaming.value = true;
 
   try {
@@ -885,27 +884,27 @@ const handleContextMenuRenameConfirm = async (newName) => {
     const parentPath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
     let newPath = parentPath + newName.trim();
 
-    // 目录在后端契约中仍以 `/` 结尾
+    // ç®å½å¨åç«¯å¥çº¦ä¸­ä»ä»¥ `/` ç»å°¾
     if (isDirectory) {
       newPath += "/";
     }
 
-    // 使用 fileOperations 重命�?
+    // ä½¿ç¨ fileOperations éå½å?
     const result = await fileOperations.renameItem(oldPath, newPath);
 
     if (result.success) {
       showMessage("success", result.message);
       invalidateCaches();
-      // 重新加载当前目录内容
+      // éæ°å è½½å½åç®å½åå®¹
       await refreshDirectory();
-      // 关闭对话框并清理状�?
+      // å³é­å¯¹è¯æ¡å¹¶æ¸çç¶æ?
       contextMenuRenameDialogOpen.value = false;
       contextMenuRenameItem.value = null;
     } else {
       showMessage("error", result.message);
     }
   } catch (error) {
-    log.error("重命名失�?", error);
+    log.error("éå½åå¤±è´?", error);
     showMessage("error", error.message || t("mount.rename.failed"));
   } finally {
     isRenaming.value = false;
@@ -913,7 +912,7 @@ const handleContextMenuRenameConfirm = async (newName) => {
 };
 
 /**
- * 处理右键菜单重命名取�?
+ * å¤çå³é®èåéå½ååæ¶?
  */
 const handleContextMenuRenameCancel = () => {
   contextMenuRenameDialogOpen.value = false;
@@ -921,18 +920,18 @@ const handleContextMenuRenameCancel = () => {
 };
 
 /**
- * 关闭文件篮面�?
+ * å³é­æä»¶ç¯®é¢æ?
  */
 const closeBasket = () => {
   try {
     fileBasket.closeBasket();
   } catch (error) {
-    log.error("关闭文件篮面板失�?", error);
+    log.error("å³é­æä»¶ç¯®é¢æ¿å¤±è´?", error);
   }
 };
 
 /**
- * 处理文件下载
+ * å¤çæä»¶ä¸è½½
  */
 const handleDownload = async (item) => {
   const result = await fileOperations.downloadFile(item);
@@ -945,7 +944,7 @@ const handleDownload = async (item) => {
 };
 
 /**
- * 处理获取文件链接
+ * å¤çè·åæä»¶é¾æ¥
  */
 const handleGetLink = async (item) => {
   const result = await fileOperations.getFileLink(item);
@@ -958,17 +957,17 @@ const handleGetLink = async (item) => {
 };
 
 /**
- * 处理文件预览
+ * å¤çæä»¶é¢è§
  */
 const handlePreview = async (item) => {
   if (!item || item.isDirectory) return;
 
-  // 直接导航到文件路径（pathname 表示对象�?
+  // ç´æ¥å¯¼èªå°æä»¶è·¯å¾ï¼pathname è¡¨ç¤ºå¯¹è±¡ï¼?
   await navigateToFile(item.path);
 };
 
 /**
- * 处理文件删除（显示确认对话框�?
+ * å¤çæä»¶å é¤ï¼æ¾ç¤ºç¡®è®¤å¯¹è¯æ¡ï¼?
  */
 const handleDelete = (item) => {
   itemsToDelete.value = [item];
@@ -976,7 +975,7 @@ const handleDelete = (item) => {
 };
 
 /**
- * 处理文件重命�?
+ * å¤çæä»¶éå½å?
  */
 const handleRename = async ({ item, newName }) => {
   if (!item || !newName || !newName.trim()) return;
@@ -984,29 +983,29 @@ const handleRename = async ({ item, newName }) => {
   const nameValidation = validateFsItemName(newName);
   if (!nameValidation.valid) return;
 
-  // 设置 loading 状态（用于 DirectoryList 内部的重命名对话框）
+  // è®¾ç½® loading ç¶æï¼ç¨äº DirectoryList åé¨çéå½åå¯¹è¯æ¡ï¼
   isDirectoryListRenaming.value = true;
 
   try {
-    // 构建新路�?
+    // æå»ºæ°è·¯å¾?
     const isDirectory = item.isDirectory;
     const oldPath = item.path;
     const basePath = isDirectory && oldPath.endsWith("/") ? oldPath.slice(0, -1) : oldPath;
     const parentPath = basePath.substring(0, basePath.lastIndexOf("/") + 1);
     let newPath = parentPath + newName.trim();
 
-    // 目录在后端契约中仍以 `/` 结尾
+    // ç®å½å¨åç«¯å¥çº¦ä¸­ä»ä»¥ `/` ç»å°¾
     if (isDirectory) {
       newPath += "/";
     }
 
-    // 使用fileOperations重命�?
+    // ä½¿ç¨fileOperationséå½å?
     const result = await fileOperations.renameItem(oldPath, newPath);
 
     if (result.success) {
       showMessage("success", result.message);
       invalidateCaches();
-      // 重新加载当前目录内容
+      // éæ°å è½½å½åç®å½åå®¹
       await refreshDirectory();
     } else {
       showMessage("error", result.message);
@@ -1015,22 +1014,22 @@ const handleRename = async ({ item, newName }) => {
     showMessage("error", error.message || t("mount.rename.failed"));
   } finally {
     isDirectoryListRenaming.value = false;
-    // 关闭 DirectoryList 的重命名对话�?
+    // å³é­ DirectoryList çéå½åå¯¹è¯æ¡?
     directoryListRef.value?.closeRenameDialog();
   }
 };
 
 /**
- * 处理项目选择
+ * å¤çé¡¹ç®éæ©
  */
 const handleItemSelect = (item, selected) => {
   selectItem(item, selected);
 };
 
-// handleItemDelete方法在原始文件中不存在，已删除（使用handleDelete代替�?
+// handleItemDeleteæ¹æ³å¨åå§æä»¶ä¸­ä¸å­å¨ï¼å·²å é¤ï¼ä½¿ç¨handleDeleteä»£æ¿ï¼?
 
 /**
- * 处理批量删除
+ * å¤çæ¹éå é¤
  */
 const batchDelete = () => {
   const selectedFiles = getSelectedItems();
@@ -1045,18 +1044,18 @@ const batchDelete = () => {
 };
 
 /**
- * 取消删除
+ * åæ¶å é¤
  */
 const cancelDelete = () => {
-  // 删除过程中不允许取消
+  // å é¤è¿ç¨ä¸­ä¸åè®¸åæ¶
   if (isDeleting.value) return;
 
-  // 清理删除状�?
+  // æ¸çå é¤ç¶æ?
   itemsToDelete.value = [];
 };
 
 /**
- * 确认删除
+ * ç¡®è®¤å é¤
  */
 const confirmDelete = async () => {
   if (itemsToDelete.value.length === 0 || isDeleting.value) return;
@@ -1064,40 +1063,40 @@ const confirmDelete = async () => {
   isDeleting.value = true;
 
   try {
-    // 使用fileOperations删除项目
+    // ä½¿ç¨fileOperationså é¤é¡¹ç®
     const result = await fileOperations.batchDeleteItems(itemsToDelete.value);
 
     if (result.success) {
       showMessage("success", result.message);
 
-      // 删除属于写操作：清空前端缓存（秒开快照 + 可验证缓存），强制下一次导航以服务端为�?
+      // å é¤å±äºåæä½ï¼æ¸ç©ºåç«¯ç¼å­ï¼ç§å¼å¿«ç§ + å¯éªè¯ç¼å­ï¼ï¼å¼ºå¶ä¸ä¸æ¬¡å¯¼èªä»¥æå¡ç«¯ä¸ºå?
       invalidateCaches();
-      // 立即从当前目录移除（减少等待与闪烁）
+      // ç«å³ä»å½åç®å½ç§»é¤ï¼åå°ç­å¾ä¸éªçï¼
       removeItemsFromCurrentDirectory(itemsToDelete.value.map((item) => item?.path).filter(Boolean));
 
-      // 如果是批量删除，清空选择状�?
+      // å¦ææ¯æ¹éå é¤ï¼æ¸ç©ºéæ©ç¶æ?
       if (itemsToDelete.value.length > 1) {
         clearSelection();
       }
 
-      // 关闭对话�?
+      // å³é­å¯¹è¯æ¡?
       showDeleteDialog.value = false;
       itemsToDelete.value = [];
 
-      // 重新加载当前目录内容
+      // éæ°å è½½å½åç®å½åå®¹
       await refreshDirectory();
     } else {
       showMessage("error", result.message);
     }
   } catch (error) {
-    log.error("删除操作失败:", error);
+    log.error("å é¤æä½å¤±è´¥:", error);
     showMessage("error", error.message || t("mount.messages.deleteFailed", { message: t("common.unknown") }));
   } finally {
     isDeleting.value = false;
   }
 };
 
-// 这些方法在原始MountExplorerMain.vue中不存在，已删除
+// è¿äºæ¹æ³å¨åå§MountExplorerMain.vueä¸­ä¸å­å¨ï¼å·²å é¤
 
 const handleBatchAddToBasket = () => {
   try {
@@ -1106,18 +1105,18 @@ const handleBatchAddToBasket = () => {
 
     if (result.success) {
       showMessage("success", result.message);
-      // 可选：关闭勾选模�?
+      // å¯éï¼å³é­å¾éæ¨¡å¼?
       // toggleCheckboxMode(false);
     } else {
       showMessage("error", result.message);
     }
   } catch (error) {
-    log.error("批量添加到文件篮失败:", error);
+    log.error("æ¹éæ·»å å°æä»¶ç¯®å¤±è´¥:", error);
     showMessage("error", t("fileBasket.messages.batchAddFailed"));
   }
 };
 
-// 弹窗相关方法
+// å¼¹çªç¸å³æ¹æ³
 const handleOpenUploadModal = () => {
   openUploadModal();
 };
@@ -1133,7 +1132,7 @@ const handleUploadSuccess = async (payload) => {
   if (skippedUploadCount > 0) {
     showMessage("success", t("mount.messages.uploadSuccessWithSkipped", { count, skipped: skippedUploadCount }));
   } else if (count > 1) {
-    // 兼容：多文件时给更明确的提示
+    // å¼å®¹ï¼å¤æä»¶æ¶ç»æ´æç¡®çæç¤º
     showMessage("success", t("mount.messages.uploadSuccessWithCount", { count }));
   } else {
     showMessage("success", t("mount.messages.uploadSuccess"));
@@ -1143,7 +1142,7 @@ const handleUploadSuccess = async (payload) => {
 };
 
 const handleUploadError = (error) => {
-  log.error("上传失败:", error);
+  log.error("ä¸ä¼ å¤±è´¥:", error);
   showMessage("error", error.message || t("mount.messages.uploadFailed"));
 };
 
@@ -1157,12 +1156,12 @@ const handleBatchCopy = () => {
 
 const handleCloseCopyModal = () => {
   closeCopyModal();
-  // 清理右键菜单复制项目
+  // æ¸çå³é®èåå¤å¶é¡¹ç®
   contextMenuCopyItems.value = [];
 };
 
 const handleCopyStarted = (event) => {
-  // 显示复制开始消�?
+  // æ¾ç¤ºå¤å¶å¼å§æ¶æ?
   const message =
     event?.message ||
     t("mount.taskManager.copyStarted", {
@@ -1182,27 +1181,27 @@ const handleCloseTasksModal = () => {
 };
 
 /**
- * 处理任务完成事件 - 自动刷新当前目录
+ * å¤çä»»å¡å®æäºä»¶ - èªå¨å·æ°å½åç®å½
  */
 const handleTaskCompleted = async (event) => {
-  // 延迟一小段时间再刷新，确保后端数据已同�?
+  // å»¶è¿ä¸å°æ®µæ¶é´åå·æ°ï¼ç¡®ä¿åç«¯æ°æ®å·²åæ­?
   setTimeout(async () => {
     try {
       invalidateCaches();
       await refreshDirectory();
       showMessage('success', t('mount.taskManager.taskCompletedRefresh'));
     } catch (error) {
-      log.error('[MountExplorer] 刷新目录失败:', error);
+      log.error('[MountExplorer] å·æ°ç®å½å¤±è´¥:', error);
     }
   }, 500);
 };
 
 /**
- * 处理任务创建事件
+ * å¤çä»»å¡åå»ºäºä»¶
  */
 const handleTaskCreated = (taskInfo) => {
-  // 可以在这里添加额外的任务跟踪逻辑
-  // 例如：打开任务管理器面�?
+  // å¯ä»¥å¨è¿éæ·»å é¢å¤çä»»å¡è·è¸ªé»è¾
+  // ä¾å¦ï¼æå¼ä»»å¡ç®¡çå¨é¢æ?
   // openTasksModal();
 };
 
@@ -1210,22 +1209,22 @@ const handleShowMessage = (messageInfo) => {
   showMessage(messageInfo.type, messageInfo.message);
 };
 
-// 用于存储清除高亮的函数引用，以便在下次右键时先移除旧监听�?
+// ç¨äºå­å¨æ¸é¤é«äº®çå½æ°å¼ç¨ï¼ä»¥ä¾¿å¨ä¸æ¬¡å³é®æ¶åç§»é¤æ§çå¬å?
 let clearHighlightHandler = null;
 let stopClearHighlightListener = null;
 
-// 处理右键菜单事件
-// 1. 单文件右键：只临时高亮显示当前文�?
-// 2. 有选中项时右键：操作已选中的项�?
+// å¤çå³é®èåäºä»¶
+// 1. åæä»¶å³é®ï¼åªä¸´æ¶é«äº®æ¾ç¤ºå½åæä»?
+// 2. æéä¸­é¡¹æ¶å³é®ï¼æä½å·²éä¸­çé¡¹ç?
 const handleFileContextMenu = (payload) => {
   if (!contextMenu) return;
   const { event, item, action } = payload;
 
-  // 处理特殊操作（不需�?item 的操作）
+  // å¤çç¹æ®æä½ï¼ä¸éè¦?item çæä½ï¼
   if (action) {
     switch (action) {
       case 'copy':
-        // 复制操作：使�?payload.items
+        // å¤å¶æä½ï¼ä½¿ç?payload.items
         if (payload.items && payload.items.length > 0) {
           contextMenuCopyItems.value = payload.items;
           openCopyModal();
@@ -1233,7 +1232,7 @@ const handleFileContextMenu = (payload) => {
         return;
       
       case 'add-to-basket':
-        // 添加到文件篮操作：使�?payload.items
+        // æ·»å å°æä»¶ç¯®æä½ï¼ä½¿ç?payload.items
         if (payload.items && payload.items.length > 0) {
           const result = fileBasket.addSelectedToBasket(payload.items, currentPath.value);
           if (result.success) {
@@ -1245,53 +1244,53 @@ const handleFileContextMenu = (payload) => {
         return;
       
       case 'toggle-checkboxes':
-        // 切换勾选框显示
+        // åæ¢å¾éæ¡æ¾ç¤º
         explorerSettings.toggleShowCheckboxes();
         return;
     }
   }
 
-  // 常规右键菜单处理（需�?item�?
+  // å¸¸è§å³é®èåå¤çï¼éè¦?itemï¼?
   if (!item) return;
 
-  // 先移除之前的监听器（如果存在�?
+  // åç§»é¤ä¹åççå¬å¨ï¼å¦æå­å¨ï¼?
   if (typeof stopClearHighlightListener === "function") {
     stopClearHighlightListener();
     stopClearHighlightListener = null;
   }
   clearHighlightHandler = null;
 
-  // 获取当前已选中的项�?
+  // è·åå½åå·²éä¸­çé¡¹ç?
   const selectedFiles = getSelectedItems();
   const isItemSelected = selectedFiles.some((i) => i.path === item.path);
 
   let itemsForMenu;
 
   if (selectedFiles.length > 0) {
-    // 有选中项时�?
-    // - 如果右键的项目已在选中列表中，操作所有选中项目
-    // - 如果右键的项目不在选中列表中，只操作当前项目（不改变选中状态）
+    // æéä¸­é¡¹æ¶ï¼?
+    // - å¦æå³é®çé¡¹ç®å·²å¨éä¸­åè¡¨ä¸­ï¼æä½ææéä¸­é¡¹ç®
+    // - å¦æå³é®çé¡¹ç®ä¸å¨éä¸­åè¡¨ä¸­ï¼åªæä½å½åé¡¹ç®ï¼ä¸æ¹åéä¸­ç¶æï¼
     if (isItemSelected) {
       itemsForMenu = selectedFiles;
-      // 已选中的项目不需要临时高�?
+      // å·²éä¸­çé¡¹ç®ä¸éè¦ä¸´æ¶é«äº?
       contextHighlightPath.value = null;
     } else {
       itemsForMenu = [item];
-      // 设置临时高亮
+      // è®¾ç½®ä¸´æ¶é«äº®
       contextHighlightPath.value = item.path;
     }
   } else {
-    // 无选中项：只操作当前右键的项目，设置临时高�?
+    // æ éä¸­é¡¹ï¼åªæä½å½åå³é®çé¡¹ç®ï¼è®¾ç½®ä¸´æ¶é«äº?
     itemsForMenu = [item];
     contextHighlightPath.value = item.path;
   }
 
-  // 显示右键菜单（传递当前勾选框显示状态）
+  // æ¾ç¤ºå³é®èåï¼ä¼ éå½åå¾éæ¡æ¾ç¤ºç¶æï¼
   contextMenu.showContextMenu(event, item, itemsForMenu, darkMode.value, explorerSettings.settings.showCheckboxes);
 
-  // 创建清除高亮的处理函�?
-  // 只监�?click 事件（左键点击关闭菜单时清除高亮�?
-  // 不监�?contextmenu 事件，因为下次右键会直接设置新的高亮
+  // åå»ºæ¸é¤é«äº®çå¤çå½æ?
+  // åªçå?click äºä»¶ï¼å·¦é®ç¹å»å³é­èåæ¶æ¸é¤é«äº®ï¼?
+  // ä¸çå?contextmenu äºä»¶ï¼å ä¸ºä¸æ¬¡å³é®ä¼ç´æ¥è®¾ç½®æ°çé«äº®
   clearHighlightHandler = () => {
     contextHighlightPath.value = null;
     if (typeof stopClearHighlightListener === "function") {
@@ -1300,8 +1299,8 @@ const handleFileContextMenu = (payload) => {
     }
   };
 
-  // 延迟添加监听器，避免当前事件立即触发
-  // 使用 ref 存储 timeout ID 以便在组件卸载时清理
+  // å»¶è¿æ·»å çå¬å¨ï¼é¿åå½åäºä»¶ç«å³è§¦å
+  // ä½¿ç¨ ref å­å¨ timeout ID ä»¥ä¾¿å¨ç»ä»¶å¸è½½æ¶æ¸ç
   const timeoutId = setTimeout(() => {
     if (clearHighlightHandler) {
       stopClearHighlightListener = useEventListener(document, "click", clearHighlightHandler, { once: true });
@@ -1309,42 +1308,42 @@ const handleFileContextMenu = (payload) => {
   }, 50);
 };
 
-// 密码验证事件处理
+// å¯ç éªè¯äºä»¶å¤ç
 const handlePasswordVerified = ({ path, token, message }) => {
-  // 保存验证 token
+  // ä¿å­éªè¯ token
   pathPassword.savePathToken(path, token);
 
-  // 显示成功消息
+  // æ¾ç¤ºæåæ¶æ¯
   showMessage("success", message || t("mount.pathPassword.verified"));
 
-  // 关闭弹窗
+  // å³é­å¼¹çª
   pathPassword.closePasswordDialog();
   pathPassword.clearPendingPath();
 
-  // 重新加载当前路由（可能是目录，也可能是文件深链）
+  // éæ°å è½½å½åè·¯ç±ï¼å¯è½æ¯ç®å½ï¼ä¹å¯è½æ¯æä»¶æ·±é¾ï¼
   refreshCurrentRoute();
 };
 
 const handlePasswordCancel = async () => {
-  // 关闭密码弹窗
+  // å³é­å¯ç å¼¹çª
   pathPassword.closePasswordDialog();
   pathPassword.clearPendingPath();
 
-  // 计算父目录路�?
+  // è®¡ç®ç¶ç®å½è·¯å¾?
   const currentPathValue = currentPath.value;
   let parentPath = "/";
 
   if (currentPathValue && currentPathValue !== "/") {
-    // 移除末尾的斜杠（如果有）
+    // ç§»é¤æ«å°¾çææ ï¼å¦ææï¼
     const normalized = currentPathValue.replace(/\/+$/, "");
-    // 获取最后一个斜杠之前的部分
+    // è·åæåä¸ä¸ªææ ä¹åçé¨å
     const lastSlashIndex = normalized.lastIndexOf("/");
     if (lastSlashIndex > 0) {
       parentPath = normalized.substring(0, lastSlashIndex);
     }
   }
 
-  // 导航到父目录
+  // å¯¼èªå°ç¶ç®å½
   await navigateTo(parentPath);
 };
 
@@ -1353,14 +1352,14 @@ const handlePasswordClose = () => {
 };
 
 const handlePasswordError = ({ message }) => {
-  log.error("密码验证错误:", message);
+  log.error("å¯ç éªè¯éè¯¯:", message);
   showMessage("error", message);
 };
 
-// 预览相关方法
+// é¢è§ç¸å³æ¹æ³
 let lastPreviewLoadedKey = "";
 const handlePreviewLoaded = () => {
-  // 避免同一个文件在媒体事件重复触发时刷�?
+  // é¿ååä¸ä¸ªæä»¶å¨åªä½äºä»¶éå¤è§¦åæ¶å·å±?
   const f = previewInfo.value || previewFile.value;
   const key = f?.path || f?.name || "";
   if (key && key === lastPreviewLoadedKey) return;
@@ -1368,7 +1367,7 @@ const handlePreviewLoaded = () => {
 };
 
 const handlePreviewError = (error) => {
-  log.error("预览加载失败:", error);
+  log.error("é¢è§å è½½å¤±è´¥:", error);
   showMessage("error", t("mount.messages.previewError"));
 };
 
@@ -1377,7 +1376,7 @@ const closePreviewWithUrl = async () => {
 };
 
 const handleRetryDirectory = async () => {
-  // 清掉当前错误
+  // æ¸æå½åéè¯¯
   error.value = null;
   await refreshDirectory();
 };
@@ -1386,23 +1385,23 @@ const dismissDirectoryError = () => {
   error.value = null;
 };
 
-// 预览相关事件处理已在上面定义
+// é¢è§ç¸å³äºä»¶å¤çå·²å¨ä¸é¢å®ä¹
 
-// 提供数据给子组件
+// æä¾æ°æ®ç»å­ç»ä»¶
 provide("darkMode", darkMode);
 provide("isAdmin", isAdmin);
 provide("apiKeyInfo", apiKeyInfo);
 provide("hasPermissionForCurrentPath", hasPermissionForCurrentPath);
 provide("navigateToFile", navigateToFile);
 
-// 处理认证状态变�?
+// å¤çè®¤è¯ç¶æåå?
 const handleAuthStateChange = (event) => {
-  // 权限状态会自动更新，这里只需要记录日�?
+  // æéç¶æä¼èªå¨æ´æ°ï¼è¿éåªéè¦è®°å½æ¥å¿?
 };
 
-// 全局快捷键处�?
+// å¨å±å¿«æ·é®å¤ç?
 const handleGlobalKeydown = (event) => {
-  // Ctrl+K 打开搜索
+  // Ctrl+K æå¼æç´¢
   if ((event.ctrlKey || event.metaKey) && event.key === "k") {
     event.preventDefault();
     if (hasPermission.value && !isSearchModalOpen.value) {
@@ -1410,17 +1409,17 @@ const handleGlobalKeydown = (event) => {
     }
   }
 
-  // ESC 关闭搜索
+  // ESC å³é­æç´¢
   if (event.key === "Escape" && isSearchModalOpen.value) {
     handleCloseSearchModal();
   }
 };
 
-// 注册全局事件（自动清理）
+// æ³¨åå¨å±äºä»¶ï¼èªå¨æ¸çï¼
 useEventListener(window, "auth-state-changed", handleAuthStateChange);
 useEventListener(document, "keydown", handleGlobalKeydown);
 
-// 监听目录项目变化，更新选择状态（仅针对可见条目）
+// çå¬ç®å½é¡¹ç®ååï¼æ´æ°éæ©ç¶æï¼ä»éå¯¹å¯è§æ¡ç®ï¼
 watch(
   () => visibleItems.value,
   (newItems) => {
@@ -1429,7 +1428,7 @@ watch(
   { immediate: true }
 );
 
-// 监听路径变化，自动关闭密码弹�?
+// çå¬è·¯å¾ååï¼èªå¨å³é­å¯ç å¼¹çª?
 watch(
   () => currentPath.value,
   (newPath, oldPath) => {
@@ -1440,22 +1439,22 @@ watch(
   }
 );
 
-// 组件卸载时清理资�?
+// ç»ä»¶å¸è½½æ¶æ¸çèµæº?
 onBeforeUnmount(() => {
-  // 清理 clearHighlightHandler 事件监听�?
+  // æ¸ç clearHighlightHandler äºä»¶çå¬å?
   if (typeof stopClearHighlightListener === "function") {
     stopClearHighlightListener();
     stopClearHighlightListener = null;
   }
   clearHighlightHandler = null;
 
-  // 清理 MutationObserver
+  // æ¸ç MutationObserver
   explorerSettings.cleanupDarkModeObserver();
 
-  // 停止预览
+  // åæ­¢é¢è§
   stopPreview();
 
-  // 清理选择状�?
+  // æ¸çéæ©ç¶æ?
   clearSelection();
 });
 </script>
