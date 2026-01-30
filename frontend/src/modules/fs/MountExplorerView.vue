@@ -1,53 +1,5 @@
 <template>
   <div class="mount-explorer-container mx-auto px-3 sm:px-6 flex-1 flex flex-col pt-6 sm:pt-8 w-full max-w-full sm:max-w-6xl">
-    <div class="header mb-4 border-b pb-2 flex justify-between items-center" :class="darkMode ? 'border-gray-800' : 'border-gray-100'">
-      <h2 class="text-xl font-semibold" :class="darkMode ? 'text-gray-100' : 'text-gray-900'">{{ $t("mount.title") }}</h2>
-
-      <!-- 右侧按钮组 -->
-      <div class="flex items-center gap-2">
-        <!-- 搜索按钮 -->
-        <button
-          @click="handleOpenSearchModal"
-          class="flex items-center gap-2 px-3 py-1.5 rounded-md border transition-all duration-200 hover:shadow-sm"
-          :class="
-            darkMode
-              ? 'border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-gray-200'
-              : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-700'
-          "
-          :title="$t('search.title')"
-        >
-          <!-- 搜索图标 -->
-          <IconSearch size="sm" class="w-4 h-4" aria-hidden="true" />
-
-          <!-- 搜索文字（在小屏幕上隐藏） -->
-          <span class="hidden sm:inline text-sm text-gray-500" :class="darkMode ? 'text-gray-400' : 'text-gray-500'">
-            {{ $t("search.placeholder") }}
-          </span>
-
-          <!-- 快捷键提示（在大屏幕上显示） -->
-          <kbd
-            class="hidden lg:inline-flex items-center px-1.5 py-0.5 text-xs font-mono rounded border"
-            :class="darkMode ? 'bg-gray-700 border-gray-600 text-gray-300' : 'bg-gray-100 border-gray-300 text-gray-600'"
-          >
-            Ctrl K
-          </kbd>
-        </button>
-
-        <!-- 设置按钮 -->
-        <button
-          @click="handleOpenSettingsDrawer"
-          class="p-2 rounded-md border transition-all duration-200 hover:shadow-sm"
-          :class="
-            darkMode
-              ? 'border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-gray-200'
-              : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-700'
-          "
-          :title="$t('mount.settings.title')"
-        >
-          <IconSettings size="sm" class="w-4 h-4" aria-hidden="true" />
-        </button>
-      </div>
-    </div>
 
     <!-- 权限管理组件 -->
     <PermissionManager
@@ -61,7 +13,7 @@
 
     <!-- 主要内容区域 -->
     <div v-if="hasPermission" class="mount-explorer-main">
-      <!-- 顶部 README（仅目录视图显示） -->
+      <!-- 顶部 README（仅目录视图显示�?-->
       <DirectoryReadme v-if="!showFilePreview" position="top" :meta="directoryMeta" :dark-mode="darkMode" />
 
       <!-- 操作按钮 -->
@@ -79,6 +31,8 @@
             @openUploadModal="handleOpenUploadModal"
             @openCopyModal="handleBatchCopy"
             @openTasksModal="handleOpenTasksModal"
+            @openSearchModal="handleOpenSearchModal"
+            @openSettingsDrawer="handleOpenSettingsDrawer"
             @task-created="handleTaskCreated"
             @show-message="handleShowMessage"
           />
@@ -119,7 +73,7 @@
         @task-completed="handleTaskCompleted"
       />
 
-      <!-- 新建文件夹弹窗 -->
+      <!-- 新建文件夹弹�?-->
       <InputDialog
         :is-open="showCreateFolderDialog"
         :title="t('mount.operations.createFolder')"
@@ -137,7 +91,7 @@
         @close="showCreateFolderDialog = false"
       />
 
-      <!-- 右键菜单重命名弹窗 -->
+      <!-- 右键菜单重命名弹�?-->
       <InputDialog
         :is-open="contextMenuRenameDialogOpen"
         :title="t('mount.rename.title')"
@@ -155,7 +109,7 @@
         @close="contextMenuRenameDialogOpen = false"
       />
 
-      <!-- 通用 ConfirmDialog 组件替换内联对话框 -->
+      <!-- 通用 ConfirmDialog 组件替换内联对话�?-->
       <ConfirmDialog
         :is-open="showDeleteDialog"
         :title="itemsToDelete.length === 1 ? t('mount.delete.title') : t('mount.batchDelete.title')"
@@ -198,7 +152,7 @@
       </ConfirmDialog>
 
 
-      <!-- 面包屑导航 -->
+      <!-- 面包屑导�?-->
       <div class="mb-4">
           <BreadcrumbNav
           :current-path="currentViewPath"
@@ -210,12 +164,12 @@
         />
       </div>
 
-      <!-- 内容区域 - 根据模式显示文件列表或文件预览 -->
+      <!-- 内容区域 - 根据模式显示文件列表或文件预�?-->
       <div class="mount-content bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
         <Transition name="fade-slide" mode="out-in" @before-enter="handleContentBeforeEnter">
           <!-- 文件列表模式 -->
           <div v-if="!showFilePreview" key="list">
-            <!-- 内嵌式密码验证 -->
+            <!-- 内嵌式密码验�?-->
             <PathPasswordDialog
               v-if="pathPassword.showPasswordDialog.value"
               :is-open="pathPassword.showPasswordDialog.value"
@@ -229,7 +183,7 @@
             />
 
             <template v-else>
-              <!-- 非阻塞错误提示：不再用 error 直接替换整个列表区域 -->
+              <!-- 非阻塞错误提示：不再�?error 直接替换整个列表区域 -->
               <div v-if="error" class="mb-4 p-4 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
                 <div class="flex items-start justify-between gap-3">
                   <div class="flex items-start">
@@ -295,7 +249,7 @@
 
           <!-- 文件预览模式 -->
           <div v-else key="preview">
-            <!-- 预览加载状态 -->
+            <!-- 预览加载状�?-->
             <div v-if="isPreviewLoading" class="p-8 text-center">
               <LoadingIndicator
                 :text="$t('common.loading')"
@@ -305,7 +259,7 @@
               />
             </div>
 
-            <!-- 预览错误状态 -->
+            <!-- 预览错误状�?-->
             <div v-else-if="previewError" class="p-8 text-center">
               <div class="flex flex-col items-center space-y-4">
                 <IconExclamation size="3xl" class="w-12 h-12 text-red-500" aria-hidden="true" />
@@ -374,10 +328,10 @@
       @close="handleCloseSettingsDrawer"
     />
 
-    <!-- FS 媒体查看器（Lightbox Shell） -->
+    <!-- FS 媒体查看器（Lightbox Shell�?-->
     <FsMediaLightboxDialog v-if="hasEverOpenedLightbox" />
 
-    <!-- 悬浮操作栏 (当有选中项时显示) -->
+    <!-- 悬浮操作�?(当有选中项时显示) -->
     <FloatingActionBar
       v-if="hasPermission && selectedCount > 0"
       :selected-count="selectedCount"
@@ -391,7 +345,7 @@
       @clear-selection="handleClearSelection"
     />
 
-    <!-- 浮动工具栏 (右下角快捷操作) -->
+    <!-- 浮动工具�?(右下角快捷操�? -->
     <FloatingToolbar
       v-if="hasPermission"
       :dark-mode="darkMode"
@@ -420,8 +374,8 @@ import { useThemeMode } from "@/composables/core/useThemeMode.js";
 import { IconBack, IconExclamation, IconSearch, IconSettings, IconXCircle } from "@/components/icons";
 import LoadingIndicator from "@/components/common/LoadingIndicator.vue";
 
-// 组合式函数 - 使用统一聚合导出
-// 按需从具体文件导入
+// 组合式函�?- 使用统一聚合导出
+// 按需从具体文件导�?
 import { useSelection } from "@/composables/ui-interaction/useSelection.js";
 import { useUIState } from "@/composables/ui-interaction/useUIState.js";
 import { useFileBasket } from "@/composables/file-system/useFileBasket.js";
@@ -429,10 +383,10 @@ import { useFileOperations } from "@/composables/file-system/useFileOperations.j
 import { usePathPassword } from "@/composables/usePathPassword.js";
 import { useContextMenu } from "@/composables/useContextMenu.js";
 
-// 视图控制器
+// 视图控制�?
 import { useMountExplorerController } from "./useMountExplorerController.js";
 
-// 子组件
+// 子组�?
 import BreadcrumbNav from "@/modules/fs/components/shared/BreadcrumbNav.vue";
 import DirectoryList from "@/modules/fs/components/directory/DirectoryList.vue";
 import DirectoryReadme from "@/modules/fs/components/DirectoryReadme.vue";
@@ -462,20 +416,20 @@ const log = createLogger("MountExplorerView");
 
 const validateFsItemNameDialog = createFsItemNameDialogValidator(t);
 
-// 使用组合式函数
+// 使用组合式函�?
 const selection = useSelection();
 const fileOperations = useFileOperations();
 const uiState = useUIState();
 const fileBasket = useFileBasket();
 const pathPassword = usePathPassword();
 
-// 右键菜单 - 延迟初始化
+// 右键菜单 - 延迟初始�?
 let contextMenu = null;
 
-// Lightbox（模块内单例）
+// Lightbox（模块内单例�?
 const fsLightbox = useFsMediaLightbox();
 
-// 文件篮状态
+// 文件篮状�?
 const { isBasketOpen } = storeToRefs(fileBasket);
 
 // 控制器：封装路由 / 权限 / 目录加载与预览初始化
@@ -528,7 +482,7 @@ const hasEverOpenedLightbox = ref(false);
 
 const scheduleWindowScrollTo = (top) => {
   if (typeof window === "undefined") return;
-  // 等列表 DOM 插入并完成一次布局后再滚动
+  // 等列�?DOM 插入并完成一次布局后再滚动
   if (typeof requestAnimationFrame === "function") {
     requestAnimationFrame(() => {
       windowScrollY.value = top;
@@ -541,15 +495,15 @@ const scheduleWindowScrollTo = (top) => {
   }, 0);
 };
 
-// 解决你说的“先下→到顶→再下”抖动：把滚动设置统一收口到 Transition 的进入阶段，只执行一次
+// 解决你说的“先下→到顶→再下”抖动：把滚动设置统一收口�?Transition 的进入阶段，只执行一�?
 const handleContentBeforeEnter = () => {
-  // 进入预览：默认回到顶部
+  // 进入预览：默认回到顶�?
   if (showFilePreview.value) {
     scheduleWindowScrollTo(0);
     return;
   }
 
-  // 回到列表：如果 controller 有“待恢复的滚动值”，在列表真正进入前先设置好
+  // 回到列表：如�?controller 有“待恢复的滚动值”，在列表真正进入前先设置好
   if (typeof consumePendingScrollRestore === "function") {
     const value = consumePendingScrollRestore();
     if (typeof value === "number") {
@@ -558,7 +512,7 @@ const handleContentBeforeEnter = () => {
   }
 };
 
-// 根据目录 Meta 的隐藏规则计算实际可见条目
+// 根据目录 Meta 的隐藏规则计算实际可见条�?
 const visibleItems = computed(() => {
   const items = directoryItems.value || [];
   const meta = directoryMeta.value;
@@ -591,7 +545,7 @@ const { selectedItems, selectedCount, setAvailableItems, toggleSelectAll, getSel
 const {
   // 消息管理
   showMessage,
-  // 弹窗状态管理
+  // 弹窗状态管�?
   isUploadModalOpen,
   isCopyModalOpen,
   isTasksModalOpen,
@@ -611,26 +565,26 @@ const showDeleteDialog = ref(false);
 const itemsToDelete = ref([]);
 const isDeleting = ref(false);
 
-// 右键菜单相关状态
+// 右键菜单相关状�?
 const contextMenuRenameItem = ref(null);
 const contextMenuRenameDialogOpen = ref(false);
-const isRenaming = ref(false); // 重命名操作的 loading 状态
+const isRenaming = ref(false); // 重命名操作的 loading 状�?
 const contextMenuCopyItems = ref([]);
-// 右键菜单高亮的项目路径（临时高亮，不是勾选选中）
+// 右键菜单高亮的项目路径（临时高亮，不是勾选选中�?
 const contextHighlightPath = ref(null);
 // DirectoryList 组件引用
 const directoryListRef = ref(null);
-// DirectoryList 重命名操作的 loading 状态
+// DirectoryList 重命名操作的 loading 状�?
 const isDirectoryListRenaming = ref(false);
 
-// 新建文件夹弹窗状态
+// 新建文件夹弹窗状�?
 const showCreateFolderDialog = ref(false);
 const isCreatingFolder = ref(false);
 
-// 设置抽屉状态
+// 设置抽屉状�?
 const isSettingsDrawerOpen = ref(false);
 
-// ===== 仅“第一次打开”时才加载重弹窗组件（watch 需要在依赖变量定义之后注册） =====
+// ===== 仅“第一次打开”时才加载重弹窗组件（watch 需要在依赖变量定义之后注册�?=====
 watch(
   () => isUploadModalOpen.value,
   (open) => {
@@ -668,10 +622,10 @@ watch(
   }
 );
 
-// 初始化用户配置
+// 初始化用户配�?
 const explorerSettings = useExplorerSettings();
 
-// 从 explorerSettings 获取视图模式
+// �?explorerSettings 获取视图模式
 const viewMode = computed(() => explorerSettings.settings.viewMode);
 const setViewMode = (mode) => explorerSettings.setViewMode(mode);
 
@@ -683,13 +637,13 @@ const copyModalItems = computed(() => {
   return getSelectedItems();
 });
 
-// 初始化右键菜单
+// 初始化右键菜�?
 const initContextMenu = () => {
   contextMenu = useContextMenu({
     onDownload: handleDownload,
     onGetLink: handleGetLink,
     onRename: (item) => {
-      // 直接触发重命名，设置待重命名的项目
+      // 直接触发重命名，设置待重命名的项�?
       contextMenuRenameItem.value = item;
       contextMenuRenameDialogOpen.value = true;
     },
@@ -702,7 +656,7 @@ const initContextMenu = () => {
       showDeleteDialog.value = true;
     },
     onCopy: (items) => {
-      // 右键菜单复制：直接使用传入的项目，而不是依赖 selectedItems
+      // 右键菜单复制：直接使用传入的项目，而不是依�?selectedItems
       const itemsArray = Array.isArray(items) ? items : [items];
       if (itemsArray.length === 0) {
         showMessage("warning", t("mount.messages.noItemsSelected"));
@@ -722,7 +676,7 @@ const initContextMenu = () => {
       }
     },
     onToggleCheckboxes: () => {
-      // 切换勾选框显示状态
+      // 切换勾选框显示状�?
       explorerSettings.toggleShowCheckboxes();
     },
     t,
@@ -738,7 +692,7 @@ onMounted(() => {
 const props = defineProps({
   mode: {
     type: String,
-    default: "default", // 默认模式，或 "selection"（选择模式）
+    default: "default", // 默认模式，或 "selection"（选择模式�?
   },
 });
 
@@ -746,11 +700,11 @@ const { isDarkMode: darkMode } = useThemeMode();
 
 // 权限变化处理
 const handlePermissionChange = (hasPermission) => {
-  // 权限状态会自动更新，这里只需要记录日志
+  // 权限状态会自动更新，这里只需要记录日�?
 };
 
 // API密钥信息
-// 导航到管理页面
+// 导航到管理页�?
 const navigateToAdmin = () => {
   import("@/router").then(({ routerUtils }) => {
     routerUtils.navigateTo("admin");
@@ -771,12 +725,12 @@ const handleCloseSettingsDrawer = () => {
   isSettingsDrawerOpen.value = false;
 };
 
-// 打开文件篮
+// 打开文件�?
 const handleOpenFileBasket = () => {
   fileBasket.toggleBasket();
 };
 
-// 悬浮操作栏事件处理
+// 悬浮操作栏事件处�?
 const handleBatchDownload = async () => {
   const selectedFiles = getSelectedItems();
   for (const item of selectedFiles) {
@@ -810,7 +764,7 @@ const handleCloseSearchModal = () => {
   closeSearchModal();
 };
 
-// 处理搜索结果项点击
+// 处理搜索结果项点�?
 const handleSearchItemClick = async (item) => {
   try {
     if (!item.isDirectory) {
@@ -827,14 +781,14 @@ const handleSearchItemClick = async (item) => {
   }
 };
 
-// ===== MountExplorerMain的所有方法 =====
+// ===== MountExplorerMain的所有方�?=====
 
 /**
  * 处理导航
  */
 const handleNavigate = async (path) => {
-  // 面包屑/返回上级属于“回退导航”：
-  // - 优先保留目标目录的 history 快照
+  // 面包�?返回上级属于“回退导航”：
+  // - 优先保留目标目录�?history 快照
   if (isSameOrSubPath(path, currentViewPath.value)) {
     await navigateToPreserveHistory(path);
     return;
@@ -866,18 +820,18 @@ const handleLoadMore = async () => {
  */
 const handleViewModeChange = (newViewMode) => {
   setViewMode(newViewMode);
-  // 视图模式已通过 useExplorerSettings 自动保存到 localStorage
+  // 视图模式已通过 useExplorerSettings 自动保存�?localStorage
 };
 
 /**
- * 处理文件夹创建 - 打开弹窗
+ * 处理文件夹创�?- 打开弹窗
  */
 const handleCreateFolder = () => {
   showCreateFolderDialog.value = true;
 };
 
 /**
- * 处理新建文件夹确认
+ * 处理新建文件夹确�?
  */
 const handleCreateFolderConfirm = async (folderName) => {
   if (!folderName) return;
@@ -897,22 +851,22 @@ const handleCreateFolderConfirm = async (folderName) => {
       showMessage("error", result.message);
     }
   } catch (error) {
-    log.error("创建文件夹失败:", error);
-    showMessage("error", "创建文件夹失败，请重试");
+    log.error("创建文件夹失�?", error);
+    showMessage("error", "创建文件夹失败，请重�?);
   } finally {
     isCreatingFolder.value = false;
   }
 };
 
 /**
- * 处理新建文件夹取消
+ * 处理新建文件夹取�?
  */
 const handleCreateFolderCancel = () => {
   showCreateFolderDialog.value = false;
 };
 
 /**
- * 处理右键菜单重命名确认
+ * 处理右键菜单重命名确�?
  */
 const handleContextMenuRenameConfirm = async (newName) => {
   if (!contextMenuRenameItem.value || !newName || !newName.trim()) return;
@@ -920,7 +874,7 @@ const handleContextMenuRenameConfirm = async (newName) => {
   const nameValidation = validateFsItemName(newName);
   if (!nameValidation.valid) return;
 
-  // 设置 loading 状态
+  // 设置 loading 状�?
   isRenaming.value = true;
 
   try {
@@ -936,7 +890,7 @@ const handleContextMenuRenameConfirm = async (newName) => {
       newPath += "/";
     }
 
-    // 使用 fileOperations 重命名
+    // 使用 fileOperations 重命�?
     const result = await fileOperations.renameItem(oldPath, newPath);
 
     if (result.success) {
@@ -944,14 +898,14 @@ const handleContextMenuRenameConfirm = async (newName) => {
       invalidateCaches();
       // 重新加载当前目录内容
       await refreshDirectory();
-      // 关闭对话框并清理状态
+      // 关闭对话框并清理状�?
       contextMenuRenameDialogOpen.value = false;
       contextMenuRenameItem.value = null;
     } else {
       showMessage("error", result.message);
     }
   } catch (error) {
-    log.error("重命名失败:", error);
+    log.error("重命名失�?", error);
     showMessage("error", error.message || t("mount.rename.failed"));
   } finally {
     isRenaming.value = false;
@@ -959,7 +913,7 @@ const handleContextMenuRenameConfirm = async (newName) => {
 };
 
 /**
- * 处理右键菜单重命名取消
+ * 处理右键菜单重命名取�?
  */
 const handleContextMenuRenameCancel = () => {
   contextMenuRenameDialogOpen.value = false;
@@ -967,13 +921,13 @@ const handleContextMenuRenameCancel = () => {
 };
 
 /**
- * 关闭文件篮面板
+ * 关闭文件篮面�?
  */
 const closeBasket = () => {
   try {
     fileBasket.closeBasket();
   } catch (error) {
-    log.error("关闭文件篮面板失败:", error);
+    log.error("关闭文件篮面板失�?", error);
   }
 };
 
@@ -1009,12 +963,12 @@ const handleGetLink = async (item) => {
 const handlePreview = async (item) => {
   if (!item || item.isDirectory) return;
 
-  // 直接导航到文件路径（pathname 表示对象）
+  // 直接导航到文件路径（pathname 表示对象�?
   await navigateToFile(item.path);
 };
 
 /**
- * 处理文件删除（显示确认对话框）
+ * 处理文件删除（显示确认对话框�?
  */
 const handleDelete = (item) => {
   itemsToDelete.value = [item];
@@ -1022,7 +976,7 @@ const handleDelete = (item) => {
 };
 
 /**
- * 处理文件重命名
+ * 处理文件重命�?
  */
 const handleRename = async ({ item, newName }) => {
   if (!item || !newName || !newName.trim()) return;
@@ -1034,7 +988,7 @@ const handleRename = async ({ item, newName }) => {
   isDirectoryListRenaming.value = true;
 
   try {
-    // 构建新路径
+    // 构建新路�?
     const isDirectory = item.isDirectory;
     const oldPath = item.path;
     const basePath = isDirectory && oldPath.endsWith("/") ? oldPath.slice(0, -1) : oldPath;
@@ -1046,7 +1000,7 @@ const handleRename = async ({ item, newName }) => {
       newPath += "/";
     }
 
-    // 使用fileOperations重命名
+    // 使用fileOperations重命�?
     const result = await fileOperations.renameItem(oldPath, newPath);
 
     if (result.success) {
@@ -1061,7 +1015,7 @@ const handleRename = async ({ item, newName }) => {
     showMessage("error", error.message || t("mount.rename.failed"));
   } finally {
     isDirectoryListRenaming.value = false;
-    // 关闭 DirectoryList 的重命名对话框
+    // 关闭 DirectoryList 的重命名对话�?
     directoryListRef.value?.closeRenameDialog();
   }
 };
@@ -1073,7 +1027,7 @@ const handleItemSelect = (item, selected) => {
   selectItem(item, selected);
 };
 
-// handleItemDelete方法在原始文件中不存在，已删除（使用handleDelete代替）
+// handleItemDelete方法在原始文件中不存在，已删除（使用handleDelete代替�?
 
 /**
  * 处理批量删除
@@ -1097,7 +1051,7 @@ const cancelDelete = () => {
   // 删除过程中不允许取消
   if (isDeleting.value) return;
 
-  // 清理删除状态
+  // 清理删除状�?
   itemsToDelete.value = [];
 };
 
@@ -1116,17 +1070,17 @@ const confirmDelete = async () => {
     if (result.success) {
       showMessage("success", result.message);
 
-      // 删除属于写操作：清空前端缓存（秒开快照 + 可验证缓存），强制下一次导航以服务端为准
+      // 删除属于写操作：清空前端缓存（秒开快照 + 可验证缓存），强制下一次导航以服务端为�?
       invalidateCaches();
       // 立即从当前目录移除（减少等待与闪烁）
       removeItemsFromCurrentDirectory(itemsToDelete.value.map((item) => item?.path).filter(Boolean));
 
-      // 如果是批量删除，清空选择状态
+      // 如果是批量删除，清空选择状�?
       if (itemsToDelete.value.length > 1) {
         clearSelection();
       }
 
-      // 关闭对话框
+      // 关闭对话�?
       showDeleteDialog.value = false;
       itemsToDelete.value = [];
 
@@ -1152,7 +1106,7 @@ const handleBatchAddToBasket = () => {
 
     if (result.success) {
       showMessage("success", result.message);
-      // 可选：关闭勾选模式
+      // 可选：关闭勾选模�?
       // toggleCheckboxMode(false);
     } else {
       showMessage("error", result.message);
@@ -1208,7 +1162,7 @@ const handleCloseCopyModal = () => {
 };
 
 const handleCopyStarted = (event) => {
-  // 显示复制开始消息
+  // 显示复制开始消�?
   const message =
     event?.message ||
     t("mount.taskManager.copyStarted", {
@@ -1231,7 +1185,7 @@ const handleCloseTasksModal = () => {
  * 处理任务完成事件 - 自动刷新当前目录
  */
 const handleTaskCompleted = async (event) => {
-  // 延迟一小段时间再刷新，确保后端数据已同步
+  // 延迟一小段时间再刷新，确保后端数据已同�?
   setTimeout(async () => {
     try {
       invalidateCaches();
@@ -1248,7 +1202,7 @@ const handleTaskCompleted = async (event) => {
  */
 const handleTaskCreated = (taskInfo) => {
   // 可以在这里添加额外的任务跟踪逻辑
-  // 例如：打开任务管理器面板
+  // 例如：打开任务管理器面�?
   // openTasksModal();
 };
 
@@ -1256,22 +1210,22 @@ const handleShowMessage = (messageInfo) => {
   showMessage(messageInfo.type, messageInfo.message);
 };
 
-// 用于存储清除高亮的函数引用，以便在下次右键时先移除旧监听器
+// 用于存储清除高亮的函数引用，以便在下次右键时先移除旧监听�?
 let clearHighlightHandler = null;
 let stopClearHighlightListener = null;
 
 // 处理右键菜单事件
-// 1. 单文件右键：只临时高亮显示当前文件
-// 2. 有选中项时右键：操作已选中的项目
+// 1. 单文件右键：只临时高亮显示当前文�?
+// 2. 有选中项时右键：操作已选中的项�?
 const handleFileContextMenu = (payload) => {
   if (!contextMenu) return;
   const { event, item, action } = payload;
 
-  // 处理特殊操作（不需要 item 的操作）
+  // 处理特殊操作（不需�?item 的操作）
   if (action) {
     switch (action) {
       case 'copy':
-        // 复制操作：使用 payload.items
+        // 复制操作：使�?payload.items
         if (payload.items && payload.items.length > 0) {
           contextMenuCopyItems.value = payload.items;
           openCopyModal();
@@ -1279,7 +1233,7 @@ const handleFileContextMenu = (payload) => {
         return;
       
       case 'add-to-basket':
-        // 添加到文件篮操作：使用 payload.items
+        // 添加到文件篮操作：使�?payload.items
         if (payload.items && payload.items.length > 0) {
           const result = fileBasket.addSelectedToBasket(payload.items, currentPath.value);
           if (result.success) {
@@ -1297,29 +1251,29 @@ const handleFileContextMenu = (payload) => {
     }
   }
 
-  // 常规右键菜单处理（需要 item）
+  // 常规右键菜单处理（需�?item�?
   if (!item) return;
 
-  // 先移除之前的监听器（如果存在）
+  // 先移除之前的监听器（如果存在�?
   if (typeof stopClearHighlightListener === "function") {
     stopClearHighlightListener();
     stopClearHighlightListener = null;
   }
   clearHighlightHandler = null;
 
-  // 获取当前已选中的项目
+  // 获取当前已选中的项�?
   const selectedFiles = getSelectedItems();
   const isItemSelected = selectedFiles.some((i) => i.path === item.path);
 
   let itemsForMenu;
 
   if (selectedFiles.length > 0) {
-    // 有选中项时：
+    // 有选中项时�?
     // - 如果右键的项目已在选中列表中，操作所有选中项目
     // - 如果右键的项目不在选中列表中，只操作当前项目（不改变选中状态）
     if (isItemSelected) {
       itemsForMenu = selectedFiles;
-      // 已选中的项目不需要临时高亮
+      // 已选中的项目不需要临时高�?
       contextHighlightPath.value = null;
     } else {
       itemsForMenu = [item];
@@ -1327,7 +1281,7 @@ const handleFileContextMenu = (payload) => {
       contextHighlightPath.value = item.path;
     }
   } else {
-    // 无选中项：只操作当前右键的项目，设置临时高亮
+    // 无选中项：只操作当前右键的项目，设置临时高�?
     itemsForMenu = [item];
     contextHighlightPath.value = item.path;
   }
@@ -1335,9 +1289,9 @@ const handleFileContextMenu = (payload) => {
   // 显示右键菜单（传递当前勾选框显示状态）
   contextMenu.showContextMenu(event, item, itemsForMenu, darkMode.value, explorerSettings.settings.showCheckboxes);
 
-  // 创建清除高亮的处理函数
-  // 只监听 click 事件（左键点击关闭菜单时清除高亮）
-  // 不监听 contextmenu 事件，因为下次右键会直接设置新的高亮
+  // 创建清除高亮的处理函�?
+  // 只监�?click 事件（左键点击关闭菜单时清除高亮�?
+  // 不监�?contextmenu 事件，因为下次右键会直接设置新的高亮
   clearHighlightHandler = () => {
     contextHighlightPath.value = null;
     if (typeof stopClearHighlightListener === "function") {
@@ -1376,7 +1330,7 @@ const handlePasswordCancel = async () => {
   pathPassword.closePasswordDialog();
   pathPassword.clearPendingPath();
 
-  // 计算父目录路径
+  // 计算父目录路�?
   const currentPathValue = currentPath.value;
   let parentPath = "/";
 
@@ -1406,7 +1360,7 @@ const handlePasswordError = ({ message }) => {
 // 预览相关方法
 let lastPreviewLoadedKey = "";
 const handlePreviewLoaded = () => {
-  // 避免同一个文件在媒体事件重复触发时刷屏
+  // 避免同一个文件在媒体事件重复触发时刷�?
   const f = previewInfo.value || previewFile.value;
   const key = f?.path || f?.name || "";
   if (key && key === lastPreviewLoadedKey) return;
@@ -1441,12 +1395,12 @@ provide("apiKeyInfo", apiKeyInfo);
 provide("hasPermissionForCurrentPath", hasPermissionForCurrentPath);
 provide("navigateToFile", navigateToFile);
 
-// 处理认证状态变化
+// 处理认证状态变�?
 const handleAuthStateChange = (event) => {
-  // 权限状态会自动更新，这里只需要记录日志
+  // 权限状态会自动更新，这里只需要记录日�?
 };
 
-// 全局快捷键处理
+// 全局快捷键处�?
 const handleGlobalKeydown = (event) => {
   // Ctrl+K 打开搜索
   if ((event.ctrlKey || event.metaKey) && event.key === "k") {
@@ -1475,7 +1429,7 @@ watch(
   { immediate: true }
 );
 
-// 监听路径变化，自动关闭密码弹窗
+// 监听路径变化，自动关闭密码弹�?
 watch(
   () => currentPath.value,
   (newPath, oldPath) => {
@@ -1486,9 +1440,9 @@ watch(
   }
 );
 
-// 组件卸载时清理资源
+// 组件卸载时清理资�?
 onBeforeUnmount(() => {
-  // 清理 clearHighlightHandler 事件监听器
+  // 清理 clearHighlightHandler 事件监听�?
   if (typeof stopClearHighlightListener === "function") {
     stopClearHighlightListener();
     stopClearHighlightListener = null;
@@ -1501,7 +1455,7 @@ onBeforeUnmount(() => {
   // 停止预览
   stopPreview();
 
-  // 清理选择状态
+  // 清理选择状�?
   clearSelection();
 });
 </script>

@@ -8,18 +8,14 @@ const log = createLogger("i18n");
 
 // 获取浏览器语言设置
 const getBrowserLanguage = () => {
-  const browserLang = navigator.language || navigator.userLanguage;
-  if (browserLang.startsWith("zh")) {
-    return "zh-CN";
-  }
-  return "en-US";
+  return "zh-CN";
 };
 
 // 获取保存的语言设置，如果没有则使用浏览器语言
 const storedLanguage = useLocalStorage("language", getBrowserLanguage());
 const getSavedLanguage = () => storedLanguage.value || getBrowserLanguage();
 
-// 保存语言设置到本地存储
+// 保存语言设置到本地存�?
 export const saveLanguagePreference = (lang) => {
   storedLanguage.value = lang;
 };
@@ -33,11 +29,11 @@ const i18n = createI18n({
     "zh-CN": zhCN,
     "en-US": enUS,
   },
-  // 确保正确处理日期和数字等格式化
+  // 确保正确处理日期和数字等格式�?
   globalInjection: true,
   // 使用HTML
   warnHtmlMessage: false,
-  // 确保语言改变时静默警告
+  // 确保语言改变时静默警�?
   silentTranslationWarn: true,
   silentFallbackWarn: true,
 });
@@ -49,7 +45,7 @@ export const debugI18n = () => {
       当前语言: i18n.global.locale.value,
       回退语言: i18n.global.fallbackLocale.value,
       可用语言: Object.keys(i18n.global.messages.value),
-      模块化结构: "已启用",
+      模块化结�? "已启�?,
     });
   }
 };
