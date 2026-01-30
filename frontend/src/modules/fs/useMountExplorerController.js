@@ -398,10 +398,11 @@ export function useMountExplorerController() {
   const ensureWithinBasicPath = async (fsPath) => {
     const normalized = normalizeFsPath(fsPath);
     if (authStore.isAdmin) return normalized;
-    if (!authStore.apiKeyInfo) return normalized;
-
-    const basicPathRaw = authStore.apiKeyInfo.basic_path || "/";
-    const basicPath = normalizeFsPath(basicPathRaw);
+    const basicPathRaw =
+      authStore.userInfo?.basicPath ||
+      authStore.apiKeyInfo?.basic_path ||
+      (authStore.authType === "ecosso" && authStore.ecoOrgId ? `/drive/org/${authStore.ecoOrgId}` : "/");
+    const basicPath = normalizeFsPath(basicPathRaw || "/");
 
     if (basicPath === "/") return normalized;
 

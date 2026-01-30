@@ -24,7 +24,7 @@ const normalizePath = (value) => {
   return prefixed.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
 };
 
-const isNavigationAllowed = (basicPath, requestPath) => {
+const isNavigationAllowed = (basicPath, requestPath, allowParentNavigation = true) => {
   if (!basicPath || !requestPath) {
     return false;
   }
@@ -38,6 +38,10 @@ const isNavigationAllowed = (basicPath, requestPath) => {
 
   if (target === base || target.startsWith(`${base}/`)) {
     return true;
+  }
+
+  if (!allowParentNavigation) {
+    return false;
   }
 
   const baseParts = base.split("/").filter(Boolean);
@@ -132,12 +136,17 @@ const guardPaths = async (options, c, principal) => {
   }
 
   const basicPath = principal.attributes?.basicPath ?? "/";
+  const provider = principal.attributes?.keyInfo?.provider ?? null;
+  const allowParentNavigation = provider !== "eco";
   const paths = await resolvePaths(pathResolver, c, principal);
   const targets = paths.length > 0 ? paths : [basicPath];
 
   for (const raw of targets) {
     const candidate = raw ?? "/";
-    const allowed = pathMode === "navigation" ? isNavigationAllowed(basicPath, candidate) : authService.checkBasicPathPermission(basicPath, candidate);
+    const allowed =
+      pathMode === "navigation"
+        ? isNavigationAllowed(basicPath, candidate, allowParentNavigation)
+        : authService.checkBasicPathPermission(basicPath, candidate);
 
     if (!allowed) {
       return { success: false, path: candidate };

@@ -153,16 +153,16 @@
 
 
       <!-- é¢åå±å¯¼è?-->
-      <div class="mb-4">
+       <div class="mb-4">
           <BreadcrumbNav
-          :current-path="currentViewPath"
-          :dark-mode="darkMode"
-          @navigate="handleNavigate"
-          @prefetch="handlePrefetch"
-          :basic-path="apiKeyInfo?.basic_path || '/'"
-          :user-type="isAdmin ? 'admin' : 'user'"
-        />
-      </div>
+           :current-path="currentViewPath"
+           :dark-mode="darkMode"
+           @navigate="handleNavigate"
+           @prefetch="handlePrefetch"
+           :basic-path="effectiveBasicPath"
+           :user-type="isAdmin ? 'admin' : 'user'"
+         />
+       </div>
 
       <!-- åå®¹åºå - æ ¹æ®æ¨¡å¼æ¾ç¤ºæä»¶åè¡¨ææä»¶é¢è§?-->
       <div class="mount-content bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors duration-200">
@@ -373,6 +373,7 @@ import { useEventListener, useWindowScroll } from "@vueuse/core";
 import { useThemeMode } from "@/composables/core/useThemeMode.js";
 import { IconBack, IconExclamation, IconSearch, IconSettings, IconXCircle } from "@/components/icons";
 import LoadingIndicator from "@/components/common/LoadingIndicator.vue";
+import { useAuthStore } from "@/stores/authStore.js";
 
 // ç»åå¼å½æ?- ä½¿ç¨ç»ä¸èåå¯¼åº
 // æéä»å·ä½æä»¶å¯¼å?
@@ -415,6 +416,8 @@ const { t } = useI18n();
 const log = createLogger("MountExplorerView");
 
 const validateFsItemNameDialog = createFsItemNameDialogValidator(t);
+
+const authStore = useAuthStore();
 
 // ä½¿ç¨ç»åå¼å½æ?
 const selection = useSelection();
@@ -471,6 +474,17 @@ const {
 } = useMountExplorerController();
 
 const { y: windowScrollY } = useWindowScroll();
+
+const effectiveBasicPath = computed(() => {
+  const apiKeyBasicPath = apiKeyInfo.value?.basic_path;
+  if (apiKeyBasicPath) return apiKeyBasicPath;
+
+  const userBasicPath = authStore.userInfo?.basicPath;
+  if (userBasicPath) return userBasicPath;
+
+  const orgId = authStore.ecoOrgId;
+  return orgId ? `/drive/org/${orgId}` : "/";
+});
 
 // ===== ä»âç¬¬ä¸æ¬¡æå¼âæ¶æå è½½éå¼¹çªç»ä»¶ =====
 const hasEverOpenedUploadModal = ref(false);
