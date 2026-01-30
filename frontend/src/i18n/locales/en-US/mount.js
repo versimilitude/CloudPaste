@@ -255,6 +255,7 @@ export default {
     },
     contextMenu: {
       addToBasket: "Add to File Basket",
+      addToQuickAccess: "Add to Quick Access",
       batchDownload: "Batch Download",
       batchCopy: "Batch Copy",
       batchAddToBasket: "Batch Add to Basket",

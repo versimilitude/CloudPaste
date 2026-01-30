@@ -7,21 +7,6 @@
       <section>
         <div class="flex items-center justify-between mb-2">
           <div class="text-xs font-semibold" :class="darkMode ? 'text-gray-200' : 'text-gray-800'">快速访问</div>
-          <button
-            type="button"
-            class="inline-flex items-center gap-1 px-2 py-1 rounded border text-xs"
-            :class="
-              darkMode
-                ? 'border-gray-700 bg-gray-800 hover:bg-gray-700 text-gray-200'
-                : 'border-gray-300 bg-white hover:bg-gray-100 text-gray-700'
-            "
-            :disabled="!canPinCurrent"
-            @click="pinCurrent"
-            title="固定当前文件夹"
-          >
-            <IconBookmark size="sm" class="w-4 h-4" aria-hidden="true" />
-            固定
-          </button>
         </div>
 
         <div v-if="quickAccess.length === 0" class="text-xs py-2" :class="darkMode ? 'text-gray-500' : 'text-gray-500'">
@@ -115,7 +100,7 @@
 import { computed, reactive, watch } from "vue";
 import { useFsService } from "@/modules/fs/fsService.js";
 import { normalizeFsPath, toDirApiPath, isSameOrSubPath } from "@/utils/fsPathUtils.js";
-import { IconBookmark, IconFolder, IconFolderOpen } from "@/components/icons";
+import { IconFolder, IconFolderOpen } from "@/components/icons";
 import DriveTreeNode from "@/modules/fs/components/shared/DriveTreeNode.vue";
 
 const props = defineProps({
@@ -131,13 +116,6 @@ const fsService = useFsService();
 const rootPathNormalized = computed(() => normalizeFsPath(props.rootPath || "/"));
 const currentPathNormalized = computed(() => normalizeFsPath(props.currentPath || "/"));
 const rootLabelComputed = computed(() => props.rootLabel || "网盘");
-
-const canPinCurrent = computed(() => {
-  const cur = currentPathNormalized.value;
-  const base = rootPathNormalized.value;
-  if (base !== "/" && !(cur === base || cur.startsWith(`${base}/`))) return false;
-  return cur !== base;
-});
 
 const quickAccessStorageKey = computed(() => `eco-drive:quick-access:${rootPathNormalized.value}`);
 const quickAccess = reactive([]);
@@ -170,13 +148,18 @@ const persistQuickAccess = () => {
   }
 };
 
-const pinCurrent = () => {
-  if (!canPinCurrent.value) return;
-  const p = currentPathNormalized.value;
-  if (quickAccess.some((x) => x.path === p)) return;
-  const name = p.split("/").filter(Boolean).slice(-1)[0] || p;
-  quickAccess.unshift({ path: p, name });
+const addQuickAccess = (path, name) => {
+  const p = normalizeFsPath(path);
+  if (!p) return false;
+
+  const base = rootPathNormalized.value;
+  if (base !== "/" && !(p === base || p.startsWith(`${base}/`))) return false;
+  if (quickAccess.some((x) => x.path === p)) return true;
+
+  const displayName = String(name || p.split("/").filter(Boolean).slice(-1)[0] || p);
+  quickAccess.unshift({ path: p, name: displayName });
   persistQuickAccess();
+  return true;
 };
 
 const removeQuickAccess = (path) => {
@@ -229,6 +212,28 @@ const loadChildren = async (path) => {
   }
 };
 
+const syncFromDirectoryList = (path, items) => {
+  const p = normalizeFsPath(path);
+  if (!p || !Array.isArray(items)) return;
+
+  const base = rootPathNormalized.value;
+  if (base !== "/" && !(p === base || p.startsWith(`${base}/`))) return;
+
+  const node = ensureNode(p);
+  const dirs = items.filter(isDirectoryItem);
+  node.children = dirs
+    .map((d) => {
+      const childPath = normalizeFsPath(d.path || `${p}/${d.name}`);
+      const child = ensureNode(childPath);
+      child.name = d.name || child.name;
+      return child;
+    })
+    .filter((c) => c.path && isSameOrSubPath(base, c.path));
+
+  node.error = null;
+  node.loading = false;
+};
+
 const toggleExpand = async (path) => {
   const p = normalizeFsPath(path);
   const node = ensureNode(p);
@@ -248,5 +253,6 @@ watch(
   },
   { immediate: true }
 );
-</script>
 
+defineExpose({ addQuickAccess, syncFromDirectoryList });
+</script>

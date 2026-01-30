@@ -172,6 +172,7 @@
           <div v-if="!showFilePreview" key="list" class="flex">
             <!-- ååµå¼å¯ç éªè¯?-->
             <DriveSidebar
+              ref="driveSidebarRef"
               :root-path="effectiveBasicPath"
               :root-label="driveRootLabel"
               :current-path="currentViewPath"
@@ -378,7 +379,7 @@
 </template>
 
 <script setup>
-import { ref, computed, provide, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from "vue";
+import { ref, computed, provide, onMounted, onBeforeUnmount, watch, watchEffect, defineAsyncComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
 import { useEventListener, useWindowScroll } from "@vueuse/core";
@@ -421,7 +422,7 @@ import FloatingActionBar from "@/modules/fs/components/shared/FloatingActionBar.
 import FloatingToolbar from "@/modules/fs/components/shared/FloatingToolbar.vue";
 import BackToTop from "@/modules/fs/components/shared/BackToTop.vue";
 import { useExplorerSettings } from "@/composables/useExplorerSettings";
-import { createFsItemNameDialogValidator, isSameOrSubPath, validateFsItemName } from "@/utils/fsPathUtils.js";
+import { createFsItemNameDialogValidator, isSameOrSubPath, normalizeFsPath, validateFsItemName } from "@/utils/fsPathUtils.js";
 import { useFsMediaLightbox } from "@/modules/fs/composables/useFsMediaLightbox";
 import { createLogger } from "@/utils/logger.js";
 
@@ -508,6 +509,8 @@ const hasEverOpenedTasksModal = ref(false);
 const hasEverOpenedSearchModal = ref(false);
 const hasEverOpenedSettingsDrawer = ref(false);
 const hasEverOpenedLightbox = ref(false);
+
+const driveSidebarRef = ref(null);
 
 const scheduleWindowScrollTo = (top) => {
   if (typeof window === "undefined") return;
@@ -671,6 +674,22 @@ const initContextMenu = () => {
   contextMenu = useContextMenu({
     onDownload: handleDownload,
     onGetLink: handleGetLink,
+    onAddToQuickAccess: (itemsOrItem) => {
+      const itemsArray = Array.isArray(itemsOrItem) ? itemsOrItem : [itemsOrItem];
+      itemsArray.forEach((it) => {
+        if (!it) return;
+        const rawPath = typeof it.path === "string" ? it.path : "";
+        if (!rawPath) return;
+
+        const normalized = normalizeFsPath(rawPath);
+        const targetPath = it.isDirectory
+          ? normalized
+          : normalizeFsPath(normalized.split("/").slice(0, -1).join("/") || "/");
+
+        const name = targetPath.split("/").filter(Boolean).slice(-1)[0] || targetPath;
+        driveSidebarRef.value?.addQuickAccess(targetPath, name);
+      });
+    },
     onRename: (item) => {
       // ç´æ¥è§¦åéå½åï¼è®¾ç½®å¾éå½åçé¡¹ç?
       contextMenuRenameItem.value = item;
@@ -717,6 +736,25 @@ onMounted(() => {
   explorerSettings.setupDarkModeObserver();
   initContextMenu();
 });
+
+watchEffect(
+  () => {
+    const path = currentViewPath.value;
+    const items = visibleItems.value || [];
+
+    // Track directory changes so the tree stays in sync with Mount Explorer updates
+    const dirPaths = [];
+    for (const it of items) {
+      if (it?.isDirectory && typeof it.path === "string") {
+        dirPaths.push(it.path);
+      }
+    }
+    void dirPaths.length;
+
+    driveSidebarRef.value?.syncFromDirectoryList(path, items);
+  },
+  { flush: "post" }
+);
 
 const props = defineProps({
   mode: {

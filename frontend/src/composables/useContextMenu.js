@@ -10,6 +10,7 @@ import {
   IconDownload,
   IconLink,
   IconCopy,
+  IconBookmark,
   IconShoppingCart,
   IconCheckbox,
   IconRename,
@@ -21,6 +22,7 @@ const icons = {
   download: () => h(IconDownload, { size: 'sm' }),
   link: () => h(IconLink, { size: 'sm' }),
   copy: () => h(IconCopy, { size: 'sm' }),
+  quickAccess: () => h(IconBookmark, { size: 'sm' }),
   basket: () => h(IconShoppingCart, { size: 'sm' }),
   checkbox: () => h(IconCheckbox, { size: 'sm' }),
   edit: () => h(IconRename, { size: 'sm' }),
@@ -36,12 +38,13 @@ const icons = {
  * @param {Function} options.onDelete - 删除回调
  * @param {Function} options.onCopy - 复制回调
  * @param {Function} options.onAddToBasket - 添加到文件篮回调
+ * @param {Function} options.onAddToQuickAccess - 添加至快速访问回调
  * @param {Function} options.onToggleCheckboxes - 切换勾选框显示回调
  * @param {Function} options.t - i18n 翻译函数
  * @returns {Object} 右键菜单方法
  */
 export function useContextMenu(options = {}) {
-  const { onDownload, onGetLink, onRename, onDelete, onCopy, onAddToBasket, onToggleCheckboxes, t } = options
+  const { onDownload, onGetLink, onRename, onDelete, onCopy, onAddToBasket, onAddToQuickAccess, onToggleCheckboxes, t } = options
   
   // 当前选中的项目
   const contextItem = ref(null)
@@ -85,6 +88,16 @@ export function useContextMenu(options = {}) {
       onClick: () => onAddToBasket?.(item),
       divided: 'down',
     })
+
+    // 添加至快速访问
+    if (onAddToQuickAccess) {
+      items.push({
+        label: t?.('mount.contextMenu.addToQuickAccess') || '添加至快速访问',
+        icon: icons.quickAccess,
+        onClick: () => onAddToQuickAccess?.(item),
+        divided: 'down',
+      })
+    }
     
     // 重命名（仅文件）
     if (!item.isDirectory) {
@@ -139,6 +152,15 @@ export function useContextMenu(options = {}) {
       onClick: () => onAddToBasket?.(selectedItems),
       divided: 'down', // 在此项下方添加分隔线
     })
+
+    if (onAddToQuickAccess) {
+      items.push({
+        label: t?.('mount.contextMenu.addToQuickAccess') || '添加至快速访问',
+        icon: icons.quickAccess,
+        onClick: () => onAddToQuickAccess?.(selectedItems),
+        divided: 'down',
+      })
+    }
     
     // 批量删除
     items.push({
