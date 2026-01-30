@@ -11,6 +11,15 @@ import { createLogger } from "@/utils/logger.js";
 const DEFAULT_DEV_API_URL = "http://localhost:8787";
 const log = createLogger("ApiConfig");
 
+const getDriveBasePath = () => {
+  try {
+    if (typeof window === "undefined") return "";
+    return window.location.pathname.startsWith("/drive") ? "/drive" : "";
+  } catch {
+    return "";
+  }
+};
+
 // 检查是否在Docker环境中运行
 const isDockerEnvironment = () => {
   return import.meta.env.VITE_IS_DOCKER === "true";
@@ -23,7 +32,7 @@ function getApiBaseUrl() {
     const runtimeUrl = window.appConfig.backendUrl;
     // 统一使用__BACKEND_URL__作为占位符，避免不同环境处理逻辑不一致
     if (runtimeUrl !== "__" + "BACKEND_URL__") {
-      log.debug("使用运行时配置的后端URL:", runtimeUrl);
+      log.debug("PROD same-origin backend", window.location.origin, driveBase);
       return runtimeUrl;
     }
   }
@@ -32,7 +41,7 @@ function getApiBaseUrl() {
   if (!isDockerEnvironment() && typeof window !== "undefined" && window.localStorage) {
     const storedUrl = useLocalStorage("vite-api-base-url", "").value;
     if (storedUrl) {
-      log.debug("非Docker环境：使用localStorage中的后端URL:", storedUrl);
+      log.debug("PROD same-origin backend", window.location.origin, driveBase);
       return storedUrl;
     }
   }
@@ -45,8 +54,9 @@ function getApiBaseUrl() {
 
   // 生产环境：单 Worker 部署时使用同源（Cloudflare Workers SPA 模式）
   if (import.meta.env.PROD && typeof window !== "undefined") {
-    log.debug("生产环境：使用同源后端", window.location.origin);
-    return window.location.origin;
+    const driveBase = getDriveBasePath();
+    log.debug("PROD same-origin backend", window.location.origin, driveBase);
+    return `${window.location.origin}${driveBase}`;
   }
 
   // 最后使用默认值

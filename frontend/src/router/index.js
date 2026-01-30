@@ -42,8 +42,8 @@ const createOfflineAwareImport = (importFn, componentName = "页面") => {
     });
 };
 
-const HomeView = createOfflineAwareImport(() => import("../modules/paste/editor/MarkdownEditorView.vue"), "首页");
-const UploadView = createOfflineAwareImport(() => import("../modules/upload/public/UploadView.vue"), "文件上传页面");
+// Eco-drive mode: use mount explorer as the default entry.
+// (Other pages may still exist for debugging, but are not part of the primary UI.)
 const PasteView = createOfflineAwareImport(() => import("../modules/paste/public/PasteView.vue"), "文本分享页面");
 const FileView = createOfflineAwareImport(() => import("../modules/fileshare/public/FileView.vue"), "文件预览页面");
 const MountExplorerView = createOfflineAwareImport(() => import("../modules/fs/MountExplorerView.vue"), "挂载浏览器");
@@ -52,20 +52,18 @@ const MountExplorerView = createOfflineAwareImport(() => import("../modules/fs/M
 const routes = [
   {
     path: "/",
-    name: "Home",
-    component: HomeView,
+    redirect: "/mount-explorer",
     meta: {
-      title: "CloudPaste - 在线剪贴板",
-      originalPage: "home",
+      title: "网盘 | 环保一点通",
+      originalPage: "mount-explorer",
     },
   },
   {
     path: "/upload",
-    name: "Upload",
-    component: UploadView,
+    redirect: "/mount-explorer",
     meta: {
-      title: "文件上传 - CloudPaste",
-      originalPage: "upload",
+      title: "网盘 | 环保一点通",
+      originalPage: "mount-explorer",
     },
   },
   // 管理员登录页面
@@ -458,6 +456,13 @@ const getDefaultRouteForUser = (authStore) => {
 router.beforeEach(async (to, from, next) => {
   // 启动进度条
   NProgress.start();
+
+  const isEcoDrive = typeof window !== "undefined" && window.location.pathname.startsWith("/drive");
+  if (isEcoDrive && !to.path.startsWith("/mount-explorer")) {
+    NProgress.done();
+    next({ path: "/mount-explorer", replace: true });
+    return;
+  }
 
   try {
     const authStore = useAuthStore();

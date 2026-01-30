@@ -24,6 +24,15 @@ const log = createLogger("App");
 const authStore = useAuthStore();
 const siteConfigStore = useSiteConfigStore();
 
+// Eco-drive deployment (served under eco-guide /drive reverse proxy).
+const isEcoMode = computed(() => {
+  try {
+    return typeof window !== "undefined" && window.location.pathname.startsWith("/drive");
+  } catch {
+    return false;
+  }
+});
+
 // 主题模式: 由全局 composable 统一管理
 const { themeMode, isDarkMode, toggleThemeMode } = useThemeMode();
 
@@ -37,9 +46,9 @@ const activePage = computed(() => {
 
 // 前台入口开关（站点设置）
 // - store 未初始化前，先按“都显示”处理，避免把用户锁死在空白页面
-const canShowHomeEntry = computed(() => !siteConfigStore.isInitialized || siteConfigStore.siteHomeEditorEnabled);
-const canShowUploadEntry = computed(() => !siteConfigStore.isInitialized || siteConfigStore.siteUploadPageEnabled);
-const canShowMountEntry = computed(() => !siteConfigStore.isInitialized || siteConfigStore.siteMountExplorerEnabled);
+const canShowHomeEntry = computed(() => !isEcoMode.value && (!siteConfigStore.isInitialized || siteConfigStore.siteHomeEditorEnabled));
+const canShowUploadEntry = computed(() => !isEcoMode.value && (!siteConfigStore.isInitialized || siteConfigStore.siteUploadPageEnabled));
+const canShowMountEntry = computed(() => isEcoMode.value || !siteConfigStore.isInitialized || siteConfigStore.siteMountExplorerEnabled);
 
 // 公告入口（全站）：只有“启用 + 有内容”才显示
 const announcementModalRef = ref(null);
@@ -140,7 +149,38 @@ const isDev = import.meta.env.DEV;
 
 <template>
   <div :class="['app-container min-h-[100dvh] transition-colors duration-200', isDarkMode ? 'bg-custom-bg-900 text-custom-text-dark' : 'bg-custom-bg-50 text-custom-text']">
-    <header :class="['sticky top-0 z-50 shadow-sm transition-colors', isDarkMode ? 'bg-custom-surface-dark' : 'bg-custom-surface']">
+    <!-- Eco mode: keep only a simple drive header (match eco-guide style as much as possible). -->
+    <header
+      v-if="isEcoMode"
+      :class="['sticky top-0 z-50 shadow-sm transition-colors', isDarkMode ? 'bg-custom-surface-dark' : 'bg-custom-surface']"
+    >
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+          <div class="flex items-center gap-8">
+            <div class="flex-shrink-0 flex items-center">
+              <h1 class="text-xl font-bold">{{ siteConfigStore.siteTitle || "环保一点通" }}</h1>
+            </div>
+            <nav class="hidden sm:flex sm:space-x-8">
+              <router-link
+                to="/mount-explorer"
+                :class="[
+                  'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200',
+                  activePage === 'mount-explorer' ? 'border-primary-500 text-current' : 'border-transparent hover:border-gray-300',
+                  activePage !== 'mount-explorer' && isDarkMode ? 'text-gray-300 hover:text-gray-100' : activePage !== 'mount-explorer' ? 'text-gray-500 hover:text-gray-700' : '',
+                ]"
+              >
+                网盘
+              </router-link>
+            </nav>
+          </div>
+          <div class="flex items-center gap-3">
+            <span v-if="authStore.ecoOrgName" class="text-sm font-medium opacity-80">{{ authStore.ecoOrgName }}</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <header v-else :class="['sticky top-0 z-50 shadow-sm transition-colors', isDarkMode ? 'bg-custom-surface-dark' : 'bg-custom-surface']">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
           <div class="flex">
@@ -400,7 +440,7 @@ const isDev = import.meta.env.DEV;
       <router-view :dark-mode="isDarkMode" class="transition-opacity duration-300 flex-1 flex flex-col" :class="{ 'opacity-0': transitioning }" />
     </main>
 
-    <footer v-if="shouldShowFooter" :class="['border-t transition-colors mt-auto', isDarkMode ? 'bg-custom-surface-dark border-gray-700' : 'bg-custom-surface border-gray-200']">
+    <footer v-if="!isEcoMode && shouldShowFooter" :class="['border-t transition-colors mt-auto', isDarkMode ? 'bg-custom-surface-dark border-gray-700' : 'bg-custom-surface border-gray-200']">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-6">
         <FooterMarkdownRenderer :content="siteConfigStore.siteFooterMarkdown" :dark-mode="isDarkMode" />
       </div>
@@ -410,10 +450,11 @@ const isDev = import.meta.env.DEV;
     <!-- <EnvSwitcher v-if="showEnvSwitcher" /> -->
 
     <!-- PWA 安装提示组件 -->
-    <PWAInstallPrompt :dark-mode="isDarkMode" />
+    <PWAInstallPrompt v-if="!isEcoMode" :dark-mode="isDarkMode" />
 
     <!-- 公告：全站右上角入口打开 -->
     <AnnouncementModal
+      v-if="!isEcoMode"
       ref="announcementModalRef"
       :content="siteConfigStore.siteAnnouncementContent"
       :enabled="siteConfigStore.siteAnnouncementEnabled"
@@ -422,7 +463,7 @@ const isDev = import.meta.env.DEV;
     />
 
     <!-- 全局音乐播放器 -->
-    <GlobalMusicPlayer />
+    <GlobalMusicPlayer v-if="!isEcoMode" />
 
     <!-- 全局消息提示（Notivue） -->
     <Notivue v-slot="item">

@@ -181,58 +181,49 @@ if (savedLang.value && i18n.global.locale.value !== savedLang.value) {
   i18n.global.locale.value = savedLang.value;
 }
 
-// 挂载应用
-app.mount("#app");
-
-// 初始化认证Store和站点配置Store（在应用挂载后）
+// Initialize stores and EcoSSO before mounting (avoid initial permission wall flicker).
 const authStore = useAuthStore();
 const siteConfigStore = useSiteConfigStore();
 
-// EcoSSO bridge (embedded in Eco-Guide via iframe)
-try {
-  const isEmbedded = typeof window !== "undefined" && window.parent && window.parent !== window;
-  if (isEmbedded) {
-    let parentOrigin = null;
-    try {
-      if (document.referrer) {
-        parentOrigin = new URL(document.referrer).origin;
+const ecoSsoBootstrap = async () => {
+  try {
+    const isEmbedded = typeof window !== "undefined" && window.parent && window.parent !== window;
+    if (isEmbedded) {
+      let parentOrigin = null;
+      try {
+        if (document.referrer) parentOrigin = new URL(document.referrer).origin;
+      } catch {
+        parentOrigin = null;
       }
-    } catch (e) {
-      parentOrigin = null;
+
+      const postToParent = (msg) => {
+        try {
+          window.parent.postMessage(msg, parentOrigin || "*");
+        } catch {
+          // ignore
+        }
+      };
+
+      window.addEventListener("message", (event) => {
+        if (parentOrigin && event.origin !== parentOrigin) return;
+        const data = event.data || {};
+        if (data?.type === "ECO_SSO") {
+          authStore.setEcoSsoSession({
+            token: data.token,
+            role: data.role,
+            orgId: data.orgId,
+            orgName: data.orgName,
+            expiresAt: data.expiresAt,
+          });
+        }
+        if (data?.type === "ECO_SSO_PING") postToParent({ type: "ECO_SSO_PONG" });
+      });
+
+      postToParent({ type: "ECO_SSO_READY" });
+      return;
     }
 
-    const postToParent = (msg) => {
-      try {
-        window.parent.postMessage(msg, parentOrigin || "*");
-      } catch (e) {
-        // ignore
-      }
-    };
-
-    window.addEventListener("message", (event) => {
-      if (parentOrigin && event.origin !== parentOrigin) return;
-      const data = event.data || {};
-      if (data?.type === "ECO_SSO") {
-        authStore.setEcoSsoSession({
-          token: data.token,
-          role: data.role,
-          orgId: data.orgId,
-          orgName: data.orgName,
-          expiresAt: data.expiresAt,
-        });
-      }
-      if (data?.type === "ECO_SSO_PING") {
-        postToParent({ type: "ECO_SSO_PONG" });
-      }
-    });
-
-    postToParent({ type: "ECO_SSO_READY" });
-  }
-
-  // EcoSSO bootstrap (same-origin reverse proxy mode, NOT iframe).
-  // When CloudPaste is served under Eco-Guide's /drive/*, the user is already logged in on Eco-Guide.
-  // We can fetch a short-lived EcoSSO token from Eco-Guide and enable permissions in the UI.
-  if (!isEmbedded) {
+    // Same-origin reverse proxy mode (NOT iframe): fetch a short-lived EcoSSO token from eco-guide.
     const readCookie = (name) => {
       try {
         const part = document.cookie
@@ -258,30 +249,33 @@ try {
     };
 
     const orgId = parseOrgIdFromPath() || Number(readCookie("eco_drive_org")) || null;
-    const shouldBootstrapEco =
-      orgId &&
-      (!authStore.isAuthenticated || authStore.authType !== "ecosso" || authStore.ecoOrgId !== Number(orgId));
+    if (!orgId) return;
+    if (authStore.isAuthenticated && authStore.authType === "ecosso" && authStore.ecoOrgId === Number(orgId)) return;
 
-    if (shouldBootstrapEco) {
-      fetch(`/api/drive/sso?orgId=${encodeURIComponent(String(orgId))}`, { credentials: "include" })
-        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`EcoSSO bootstrap failed: ${r.status}`))))
-        .then((data) => {
-          authStore.setEcoSsoSession(data);
-        })
-        .catch(() => {
-          // Ignore: user may be visiting CloudPaste directly (not via Eco-Guide), or not logged in.
-        });
-    }
+    const r = await fetch(`/api/drive/sso?orgId=${encodeURIComponent(String(orgId))}`, { credentials: "include" });
+    if (!r.ok) return;
+    const payload = await r.json();
+    authStore.setEcoSsoSession(payload);
+  } catch {
+    // Ignore: user may be visiting CloudPaste directly or not logged in on eco-guide.
   }
-} catch (e) {
-  // ignore
-}
+};
 
-// 并行初始化两个Store
-Promise.all([authStore.initialize(), siteConfigStore.initialize()])
+const startApp = async () => {
+  await ecoSsoBootstrap();
+  await Promise.all([authStore.initialize(), siteConfigStore.initialize()]);
+  try {
+    await router.isReady?.();
+  } catch {
+    // ignore
+  }
+  app.mount("#app");
+};
+
+startApp()
   .then(() => {
-    log.debug("认证Store和站点配置Store初始化完成");
+    log.debug("Stores initialized");
   })
   .catch((error) => {
-    log.error("Store初始化失败:", error);
+    log.error("Failed to start app", error);
   });
