@@ -106,6 +106,12 @@ jobs:
             exit 1
           fi
 
+          # 确保 SPA 构建出来的资源路径以 /drive 为 base（否则在 eco-guide 反代下会 404）
+          if ! grep -q "/drive/assets/" "frontend/dist/index.html"; then
+            echo "❌ 前端构建产物不是 /drive base（index.html 未包含 /drive/assets/）"
+            exit 1
+          fi
+
           echo "前端构建产物大小："
           du -sh frontend/dist
           echo "前端文件数量："
@@ -134,6 +140,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          set -euo pipefail
           echo "检查并创建 D1 数据库..."
           DATABASE_LIST=$(npx wrangler d1 list --json 2>/dev/null || echo "[]")
           EXISTING_DB=$(echo "$DATABASE_LIST" | jq -r '.[] | select(.name=="cloudpaste-db") | .uuid')
@@ -141,6 +148,7 @@ jobs:
           if [ -n "$EXISTING_DB" ]; then
             echo "✅ 找到现有 D1 数据库: $EXISTING_DB"
             DATABASE_ID=$EXISTING_DB
+            DB_CREATED="false"
           else
             echo "创建新的 D1 数据库..."
             CREATE_OUTPUT=$(npx wrangler d1 create cloudpaste-db 2>&1)
@@ -151,6 +159,7 @@ jobs:
                 DATABASE_ID=$(echo "$CREATE_OUTPUT" | grep -oP "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
               fi
               echo "✅ 数据库创建成功: $DATABASE_ID"
+              DB_CREATED="true"
             else
               LIST_OUTPUT=$(npx wrangler d1 list --json 2>/dev/null || echo "[]")
               DATABASE_ID=$(echo "$LIST_OUTPUT" | jq -r '.[] | select(.name=="cloudpaste-db") | .uuid')
@@ -159,6 +168,7 @@ jobs:
                 echo "❌ 无法创建或找到 D1 数据库"
                 exit 1
               fi
+              DB_CREATED="false"
             fi
           fi
 
@@ -175,15 +185,18 @@ jobs:
           fi
 
           echo "database_id=$DATABASE_ID" >> $GITHUB_ENV
+          echo "DB_CREATED=$DB_CREATED" >> $GITHUB_ENV
 
       - name: Initialize D1 Database schema
         working-directory: ./backend
+        if: env.DB_CREATED == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          echo "初始化数据库表结构..."
-          npx wrangler d1 execute cloudpaste-db --file=./schema.sql || echo "⚠️ 表可能已存在，继续部署"
+          set -euo pipefail
+          echo "初始化数据库表结构（仅新建数据库时执行）..."
+          npx wrangler d1 execute cloudpaste-db --remote --file=./schema.sql
 
       # ==================== 步骤 4：环境变量（优先级：Worker现有 -> GitHub -> wrangler配置） ====================
       - name: Resolve ENCRYPTION_SECRET for deploy
@@ -232,6 +245,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          set -euo pipefail
           echo "🚀 使用 SPA 配置部署到 Cloudflare Workers..."
           npx wrangler deploy --config wrangler.spa.toml 2>&1 | sed -E 's/https:\/\/[a-zA-Z0-9.-]*\.(workers|pages)\.dev/https:\/\/[REDACTED].\1.dev/g'
 
