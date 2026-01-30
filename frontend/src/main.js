@@ -262,7 +262,8 @@ const ecoSsoBootstrap = async () => {
     };
 
     const fetchEcoSso = async () => {
-      const r = await fetch(`/api/drive/sso?orgId=${encodeURIComponent(String(orgId))}`, {
+      const ssoUrl = `/api/drive/sso?orgId=${encodeURIComponent(String(orgId))}`;
+      const r = await fetch(ssoUrl, {
         credentials: "include",
         cache: "no-store",
         headers: { Accept: "application/json" },
@@ -271,8 +272,30 @@ const ecoSsoBootstrap = async () => {
         redirectToLogin();
         return null;
       }
-      if (!r.ok) return null;
-      return r.json();
+      if (r.status === 403) {
+        // Typically means the org is not accessible for this user; go back to org selection.
+        try {
+          window.location.href = "/drive/";
+        } catch {
+          // ignore
+        }
+        return null;
+      }
+      if (!r.ok) {
+        try {
+          const body = await r.text();
+          log.warn("[EcoSSO] SSO request failed", { status: r.status, url: ssoUrl, body: body?.slice?.(0, 200) });
+        } catch {
+          log.warn("[EcoSSO] SSO request failed", { status: r.status, url: ssoUrl });
+        }
+        return null;
+      }
+      try {
+        return await r.json();
+      } catch (e) {
+        log.warn("[EcoSSO] Invalid JSON from SSO endpoint", e);
+        return null;
+      }
     };
 
     const payload = await fetchEcoSso();

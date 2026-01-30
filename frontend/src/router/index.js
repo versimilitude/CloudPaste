@@ -479,8 +479,8 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // 自动游客会话：在首次未认证状态下尝试一次基于 Guest API Key 的登录
-    // 统一在任意路由入口触发一次（包括 /admin 相关路由），由 maybeAutoGuestLogin 自身通过 guestAutoTried 控制只尝试一次
-    if (!authStore.isAuthenticated && authStore.authType === "none") {
+    // Eco-drive 部署不启用游客会话（统一走 EcoSSO）。
+    if (!isEcoDrive && !authStore.isAuthenticated && authStore.authType === "none") {
       if (typeof authStore.maybeAutoGuestLogin === "function") {
         await authStore.maybeAutoGuestLogin();
       }

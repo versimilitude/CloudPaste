@@ -385,6 +385,18 @@ export const useAuthStore = defineStore("auth", () => {
       return;
     }
 
+    // Eco-drive reverse-proxy deployment:
+    // - Do NOT restore admin/API-key sessions from localStorage
+    // - Do NOT attempt guest auto-login
+    // EcoSSO session is short-lived and kept in-memory.
+    const isEcoDrive = typeof window !== "undefined" && window.location.pathname.startsWith("/drive");
+    if (isEcoDrive) {
+      clearStorage();
+      guestAutoTried.value = true;
+      initialized.value = true;
+      return;
+    }
+
     log.debug("初始化认证状态...");
     loadFromStorage();
 
