@@ -14,6 +14,7 @@ local_protocol = "http"
 
 # 环境变量
 [vars]
+ENCRYPTION_SECRET = "default-encryption-key"
 # 用于加密敏感配置的密钥
 ENCRYPTION_SECRET = "default-encryption-key"
 # 管理员Token过期天数，默认7天
@@ -50,6 +51,7 @@ crons = ["*/5 * * * *"]
 [assets]
 # 静态资源目录（相对于 backend/ 目录）
 directory = "../frontend/dist"
+binding = "ASSETS"
 
 # SPA 模式：前端路由刷新时返回 index.html（避免 404）
 not_found_handling = "single-page-application"
