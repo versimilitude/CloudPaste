@@ -228,6 +228,51 @@ try {
 
     postToParent({ type: "ECO_SSO_READY" });
   }
+
+  // EcoSSO bootstrap (same-origin reverse proxy mode, NOT iframe).
+  // When CloudPaste is served under Eco-Guide's /drive/*, the user is already logged in on Eco-Guide.
+  // We can fetch a short-lived EcoSSO token from Eco-Guide and enable permissions in the UI.
+  if (!isEmbedded) {
+    const readCookie = (name) => {
+      try {
+        const part = document.cookie
+          .split(";")
+          .map((v) => v.trim())
+          .find((v) => v.startsWith(`${name}=`));
+        if (!part) return null;
+        return decodeURIComponent(part.split("=").slice(1).join("=") || "");
+      } catch {
+        return null;
+      }
+    };
+
+    const parseOrgIdFromPath = () => {
+      try {
+        const m = window.location.pathname.match(/\/org\/(\d+)(\/|$)/);
+        if (!m?.[1]) return null;
+        const id = Number(m[1]);
+        return Number.isFinite(id) && id > 0 ? id : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const orgId = parseOrgIdFromPath() || Number(readCookie("eco_drive_org")) || null;
+    const shouldBootstrapEco =
+      orgId &&
+      (!authStore.isAuthenticated || authStore.authType !== "ecosso" || authStore.ecoOrgId !== Number(orgId));
+
+    if (shouldBootstrapEco) {
+      fetch(`/api/drive/sso?orgId=${encodeURIComponent(String(orgId))}`, { credentials: "include" })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`EcoSSO bootstrap failed: ${r.status}`))))
+        .then((data) => {
+          authStore.setEcoSsoSession(data);
+        })
+        .catch(() => {
+          // Ignore: user may be visiting CloudPaste directly (not via Eco-Guide), or not logged in.
+        });
+    }
+  }
 } catch (e) {
   // ignore
 }
