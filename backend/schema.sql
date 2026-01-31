@@ -419,6 +419,110 @@ CREATE INDEX idx_vfs_nodes_scope ON vfs_nodes(owner_type, owner_id, scope_type, 
 CREATE INDEX idx_vfs_nodes_scope_id ON vfs_nodes(scope_type, scope_id);
 
 -- ================================
+-- Drive (Eco) - scheme B
+-- - VFS 作为目录真相；对象存储仅保存内容（blob）
+-- ================================
+
+-- 去重后的内容对象（按 org + sha256）
+CREATE TABLE IF NOT EXISTS drive_blobs (
+  id TEXT PRIMARY KEY,
+  org_id INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  storage_type TEXT NOT NULL DEFAULT 'S3',
+  storage_key TEXT NOT NULL,
+  size INTEGER NOT NULL DEFAULT 0,
+  mime_type TEXT,
+  etag TEXT,
+  ref_count INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at DATETIME,
+  UNIQUE (org_id, sha256),
+  UNIQUE (org_id, storage_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_drive_blobs_org ON drive_blobs(org_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_drive_blobs_sha ON drive_blobs(org_id, sha256);
+
+-- 文件历史版本（最多 10 个；超限丢弃最旧）
+CREATE TABLE IF NOT EXISTS drive_file_versions (
+  id TEXT PRIMARY KEY,
+  file_node_id TEXT NOT NULL,
+  version_no INTEGER NOT NULL,
+  org_id INTEGER NOT NULL,
+  blob_id TEXT,
+  sha256 TEXT,
+  storage_key TEXT,
+  size INTEGER,
+  mime_type TEXT,
+  note TEXT,
+  created_by TEXT,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (file_node_id) REFERENCES vfs_nodes(id) ON DELETE CASCADE,
+  FOREIGN KEY (blob_id) REFERENCES drive_blobs(id) ON DELETE SET NULL,
+  UNIQUE (file_node_id, version_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_drive_versions_file ON drive_file_versions(file_node_id, version_no DESC);
+CREATE INDEX IF NOT EXISTS idx_drive_versions_org ON drive_file_versions(org_id, created_at DESC);
+
+-- 回收站（只记录“顶层被删除节点”；节点子树保留在 vfs_nodes，status=deleted）
+CREATE TABLE IF NOT EXISTS drive_trash (
+  id TEXT PRIMARY KEY,
+  org_id INTEGER NOT NULL,
+  owner_type TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  scope_type TEXT NOT NULL,
+  scope_id TEXT NOT NULL,
+  node_id TEXT NOT NULL,
+  original_parent_id TEXT,
+  original_name TEXT,
+  deleted_by TEXT,
+  deleted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  purge_after DATETIME NOT NULL,
+  restored_at DATETIME,
+  purged_at DATETIME,
+  FOREIGN KEY (node_id) REFERENCES vfs_nodes(id) ON DELETE CASCADE,
+  UNIQUE (node_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_drive_trash_org ON drive_trash(org_id, deleted_at DESC);
+CREATE INDEX IF NOT EXISTS idx_drive_trash_purge ON drive_trash(purge_after, purged_at);
+
+-- 节点扩展属性（对接档案管理：项目/类型/日期/标记/备注/自定义 KV）
+CREATE TABLE IF NOT EXISTS drive_node_meta (
+  node_id TEXT PRIMARY KEY,
+  org_id INTEGER NOT NULL,
+  project_name TEXT,
+  doc_type TEXT,
+  doc_date TEXT,
+  status TEXT,
+  tags_json TEXT,
+  note TEXT,
+  meta_json TEXT,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (node_id) REFERENCES vfs_nodes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_drive_node_meta_org ON drive_node_meta(org_id);
+CREATE INDEX IF NOT EXISTS idx_drive_node_meta_doc_type ON drive_node_meta(org_id, doc_type);
+CREATE INDEX IF NOT EXISTS idx_drive_node_meta_project ON drive_node_meta(org_id, project_name);
+
+-- 快速访问（固定/收藏文件夹）
+CREATE TABLE IF NOT EXISTS drive_pins (
+  id TEXT PRIMARY KEY,
+  org_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
+  node_id TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (node_id) REFERENCES vfs_nodes(id) ON DELETE CASCADE,
+  UNIQUE (org_id, user_id, node_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_drive_pins_user ON drive_pins(org_id, user_id, created_at DESC);
+
+-- ================================
 -- 分片上传明细（临时数据：complete 后删除）
 -- - 一片一行，避免并发写入互相覆盖
 -- ================================

@@ -13,6 +13,7 @@ import {
   IconBookmark,
   IconShoppingCart,
   IconCheckbox,
+  IconClock,
   IconRename,
   IconDelete
 } from '@/components/icons'
@@ -25,6 +26,7 @@ const icons = {
   quickAccess: () => h(IconBookmark, { size: 'sm' }),
   basket: () => h(IconShoppingCart, { size: 'sm' }),
   checkbox: () => h(IconCheckbox, { size: 'sm' }),
+  versions: () => h(IconClock, { size: 'sm' }),
   edit: () => h(IconRename, { size: 'sm' }),
   delete: () => h(IconDelete, { size: 'sm', class: 'text-red-500' }),
 }
@@ -39,12 +41,13 @@ const icons = {
  * @param {Function} options.onCopy - 复制回调
  * @param {Function} options.onAddToBasket - 添加到文件篮回调
  * @param {Function} options.onAddToQuickAccess - 添加至快速访问回调
+ * @param {Function} options.onShowVersions - 版本历史回调（仅文件）
  * @param {Function} options.onToggleCheckboxes - 切换勾选框显示回调
  * @param {Function} options.t - i18n 翻译函数
  * @returns {Object} 右键菜单方法
  */
 export function useContextMenu(options = {}) {
-  const { onDownload, onGetLink, onRename, onDelete, onCopy, onAddToBasket, onAddToQuickAccess, onToggleCheckboxes, t } = options
+  const { onDownload, onGetLink, onRename, onDelete, onCopy, onAddToBasket, onAddToQuickAccess, onShowVersions, onToggleCheckboxes, t } = options
   
   // 当前选中的项目
   const contextItem = ref(null)
@@ -80,6 +83,15 @@ export function useContextMenu(options = {}) {
       icon: icons.copy,
       onClick: () => onCopy?.(item),
     })
+
+    // 版本历史（仅文件）
+    if (!item.isDirectory && onShowVersions) {
+      items.push({
+        label: t?.('mount.contextMenu.versions') || '版本历史',
+        icon: icons.versions,
+        onClick: () => onShowVersions?.(item),
+      })
+    }
     
     // 添加到文件篮
     items.push({

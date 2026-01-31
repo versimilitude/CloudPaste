@@ -92,6 +92,21 @@
           </div>
         </div>
       </section>
+
+      <div class="my-4 border-t" :class="darkMode ? 'border-gray-800' : 'border-gray-200'"></div>
+
+      <section>
+        <div class="text-xs font-semibold mb-2" :class="darkMode ? 'text-gray-200' : 'text-gray-800'">系统</div>
+        <button
+          type="button"
+          class="w-full flex items-center gap-2 px-2 py-1 rounded text-left text-xs"
+          :class="darkMode ? 'text-gray-200 hover:bg-gray-800' : 'text-gray-700 hover:bg-white'"
+          @click="emit('open-trash')"
+        >
+          <IconDelete size="sm" class="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span class="truncate">回收站</span>
+        </button>
+      </section>
     </div>
   </aside>
 </template>
@@ -100,7 +115,7 @@
 import { computed, reactive, watch } from "vue";
 import { useFsService } from "@/modules/fs/fsService.js";
 import { normalizeFsPath, toDirApiPath, isSameOrSubPath } from "@/utils/fsPathUtils.js";
-import { IconFolder, IconFolderOpen } from "@/components/icons";
+import { IconFolder, IconFolderOpen, IconDelete } from "@/components/icons";
 import DriveTreeNode from "@/modules/fs/components/shared/DriveTreeNode.vue";
 
 const props = defineProps({
@@ -110,7 +125,7 @@ const props = defineProps({
   darkMode: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["navigate", "prefetch"]);
+const emit = defineEmits(["navigate", "prefetch", "open-trash"]);
 const fsService = useFsService();
 
 const rootPathNormalized = computed(() => normalizeFsPath(props.rootPath || "/"));

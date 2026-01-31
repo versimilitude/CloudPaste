@@ -642,6 +642,141 @@ export async function createVfsTables(db) {
   console.log("vfs_nodes 表检查/创建完成");
 }
 
+export async function createDriveTables(db) {
+  console.log("创建 Drive 表（scheme B：VFS 目录 + blob 内容）...");
+
+  // 去重后的内容对象（按 org + sha256）
+  await db
+    .prepare(
+      `
+      CREATE TABLE IF NOT EXISTS ${DbTables.DRIVE_BLOBS} (
+        id TEXT PRIMARY KEY,
+        org_id INTEGER NOT NULL,
+        sha256 TEXT NOT NULL,
+        storage_type TEXT NOT NULL DEFAULT 'S3',
+        storage_key TEXT NOT NULL,
+        size INTEGER NOT NULL DEFAULT 0,
+        mime_type TEXT,
+        etag TEXT,
+        ref_count INTEGER NOT NULL DEFAULT 0,
+        created_by TEXT,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        deleted_at DATETIME,
+        UNIQUE (org_id, sha256),
+        UNIQUE (org_id, storage_key)
+      )
+    `,
+    )
+    .run();
+
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_drive_blobs_org ON ${DbTables.DRIVE_BLOBS}(org_id, created_at DESC)`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_drive_blobs_sha ON ${DbTables.DRIVE_BLOBS}(org_id, sha256)`).run();
+
+  // 文件历史版本（最多 10 个；超限丢弃最旧）
+  await db
+    .prepare(
+      `
+      CREATE TABLE IF NOT EXISTS ${DbTables.DRIVE_FILE_VERSIONS} (
+        id TEXT PRIMARY KEY,
+        file_node_id TEXT NOT NULL,
+        version_no INTEGER NOT NULL,
+        org_id INTEGER NOT NULL,
+        blob_id TEXT,
+        sha256 TEXT,
+        storage_key TEXT,
+        size INTEGER,
+        mime_type TEXT,
+        note TEXT,
+        created_by TEXT,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (file_node_id) REFERENCES ${DbTables.VFS_NODES}(id) ON DELETE CASCADE,
+        FOREIGN KEY (blob_id) REFERENCES ${DbTables.DRIVE_BLOBS}(id) ON DELETE SET NULL,
+        UNIQUE (file_node_id, version_no)
+      )
+    `,
+    )
+    .run();
+
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_drive_versions_file ON ${DbTables.DRIVE_FILE_VERSIONS}(file_node_id, version_no DESC)`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_drive_versions_org ON ${DbTables.DRIVE_FILE_VERSIONS}(org_id, created_at DESC)`).run();
+
+  // 回收站（只记录“顶层被删除节点”；节点子树保留在 vfs_nodes，status=deleted）
+  await db
+    .prepare(
+      `
+      CREATE TABLE IF NOT EXISTS ${DbTables.DRIVE_TRASH} (
+        id TEXT PRIMARY KEY,
+        org_id INTEGER NOT NULL,
+        owner_type TEXT NOT NULL,
+        owner_id TEXT NOT NULL,
+        scope_type TEXT NOT NULL,
+        scope_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        original_parent_id TEXT,
+        original_name TEXT,
+        deleted_by TEXT,
+        deleted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        purge_after DATETIME NOT NULL,
+        restored_at DATETIME,
+        purged_at DATETIME,
+        FOREIGN KEY (node_id) REFERENCES ${DbTables.VFS_NODES}(id) ON DELETE CASCADE,
+        UNIQUE (node_id)
+      )
+    `,
+    )
+    .run();
+
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_drive_trash_org ON ${DbTables.DRIVE_TRASH}(org_id, deleted_at DESC)`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_drive_trash_purge ON ${DbTables.DRIVE_TRASH}(purge_after, purged_at)`).run();
+
+  // 节点扩展属性（对接档案管理：项目/类型/日期/标记/备注/自定义 KV）
+  await db
+    .prepare(
+      `
+      CREATE TABLE IF NOT EXISTS ${DbTables.DRIVE_NODE_META} (
+        node_id TEXT PRIMARY KEY,
+        org_id INTEGER NOT NULL,
+        project_name TEXT,
+        doc_type TEXT,
+        doc_date TEXT,
+        status TEXT,
+        tags_json TEXT,
+        note TEXT,
+        meta_json TEXT,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (node_id) REFERENCES ${DbTables.VFS_NODES}(id) ON DELETE CASCADE
+      )
+    `,
+    )
+    .run();
+
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_drive_node_meta_org ON ${DbTables.DRIVE_NODE_META}(org_id)`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_drive_node_meta_doc_type ON ${DbTables.DRIVE_NODE_META}(org_id, doc_type)`).run();
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_drive_node_meta_project ON ${DbTables.DRIVE_NODE_META}(org_id, project_name)`).run();
+
+  // 快速访问（固定/收藏文件夹）
+  await db
+    .prepare(
+      `
+      CREATE TABLE IF NOT EXISTS ${DbTables.DRIVE_PINS} (
+        id TEXT PRIMARY KEY,
+        org_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (node_id) REFERENCES ${DbTables.VFS_NODES}(id) ON DELETE CASCADE,
+        UNIQUE (org_id, user_id, node_id)
+      )
+    `,
+    )
+    .run();
+
+  await db.prepare(`CREATE INDEX IF NOT EXISTS idx_drive_pins_user ON ${DbTables.DRIVE_PINS}(org_id, user_id, created_at DESC)`).run();
+
+  console.log("Drive 表检查/创建完成");
+}
+
 export async function createMetricsCacheTables(db) {
   console.log("创建通用指标缓存表(metrics_cache)...");
 

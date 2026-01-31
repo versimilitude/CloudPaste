@@ -11,7 +11,9 @@ import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { normalizeS3SubPath, isCompleteFilePath } from "./utils/S3PathUtils.js";
 import { updateMountLastUsed } from "../../fs/utils/MountResolver.js";
 import { buildFullProxyUrl } from "../../../constants/proxy.js";
-import { S3DriverError, AppError } from "../../../http/errors.js";
+import { S3DriverError, AppError, ValidationError, NotFoundError, AuthorizationError } from "../../../http/errors.js";
+import { VfsNodesRepository, VFS_ROOT_PARENT_ID } from "../../../repositories/VfsNodesRepository.js";
+import { buildFileInfo } from "../../utils/FileInfoBuilder.js";
 
 // 导入各个操作模块
 import { S3FileOperations } from "./operations/S3FileOperations.js";
@@ -49,6 +51,126 @@ export class S3StorageDriver extends BaseDriver {
     this.batchOps = null;
     this.uploadOps = null;
     this.backendMultipartOps = null;
+  }
+
+  _safeJsonParse(text) {
+    if (!text) return null;
+    if (typeof text === "object") return text;
+    try {
+      return JSON.parse(String(text));
+    } catch {
+      return null;
+    }
+  }
+
+  _isEcoDriveContext(ctx = {}) {
+    const userIdOrInfo = ctx?.userIdOrInfo;
+    return Boolean(
+      userIdOrInfo &&
+        typeof userIdOrInfo === "object" &&
+        userIdOrInfo.provider === "eco" &&
+        Number.isFinite(Number(userIdOrInfo.ecoOrgId)) &&
+        Number(userIdOrInfo.ecoOrgId) > 0,
+    );
+  }
+
+  _getEcoOrgId(ctx = {}) {
+    const orgId = Number(ctx?.userIdOrInfo?.ecoOrgId);
+    if (!Number.isFinite(orgId) || orgId <= 0) {
+      throw new AuthorizationError("Invalid org");
+    }
+    return orgId;
+  }
+
+  _ecoResolveOwner(ctx = {}) {
+    const orgId = this._getEcoOrgId(ctx);
+    return {
+      orgId,
+      ownerType: "eco_org",
+      ownerId: `org:${orgId}`,
+      userId: String(ctx?.userIdOrInfo?.id || ""),
+    };
+  }
+
+  _ecoSubPathToVfsPath(subPath, orgId) {
+    const raw = typeof subPath === "string" ? subPath : "";
+    const segments = raw.replace(/^\/+/, "").split("/").filter(Boolean);
+    if (segments.length < 2 || segments[0] !== "org" || String(segments[1]) !== String(orgId)) {
+      throw new AuthorizationError("Invalid org");
+    }
+    const rest = segments.slice(2);
+    if (rest.length === 0) return "/";
+    return `/${rest.join("/")}`;
+  }
+
+  async _ecoListDirectory(subPath, ctx = {}) {
+    const db = ctx?.db || null;
+    const mount = ctx?.mount || null;
+    const fsPath = ctx?.path || "/";
+    if (!db) throw new ValidationError("S3(EcoDrive).listDirectory: 缺少 db");
+    if (!mount?.id) throw new ValidationError("S3(EcoDrive).listDirectory: 缺少 mount");
+
+    const { orgId, ownerType, ownerId } = this._ecoResolveOwner(ctx);
+    const scopeType = "mount";
+    const scopeId = String(mount.id);
+    const repo = new VfsNodesRepository(db, null);
+
+    const vfsPath = this._ecoSubPathToVfsPath(subPath, orgId);
+    let parentId = VFS_ROOT_PARENT_ID;
+    if (vfsPath !== "/") {
+      const node = await repo.resolveNodeByPath({ ownerType, ownerId, scopeType, scopeId, path: vfsPath });
+      if (!node) throw new NotFoundError("目录不存在");
+      if (node.node_type !== "dir") throw new ValidationError("目标不是目录");
+      parentId = String(node.id);
+    }
+
+    const children = await repo.listChildrenByParentId({ ownerType, ownerId, scopeType, scopeId, parentId });
+    const basePath = String(fsPath || "/");
+
+    const items = await Promise.all(
+      children.map(async (row) => {
+        const isDirectory = row.node_type === "dir";
+        const childPath = `${basePath.endsWith("/") ? basePath : `${basePath}/`}${row.name}${isDirectory ? "/" : ""}`;
+        const info = await buildFileInfo({
+          fsPath: childPath,
+          name: row.name,
+          isDirectory,
+          size: row.size,
+          modified: row.updated_at || row.created_at || null,
+          mimetype: row.mime_type || null,
+          mount,
+          storageType: mount?.storage_type || this.type,
+          db,
+        });
+        return { ...info, vfs_node_id: row.id };
+      }),
+    );
+
+    return {
+      path: basePath,
+      type: "directory",
+      isRoot: vfsPath === "/",
+      mount_id: mount?.id ?? null,
+      storage_type: mount?.storage_type || this.type,
+      items,
+    };
+  }
+
+  async _ecoGetNodeByPath(subPath, ctx = {}) {
+    const db = ctx?.db || null;
+    const mount = ctx?.mount || null;
+    if (!db) throw new ValidationError("S3(EcoDrive): 缺少 db");
+    if (!mount?.id) throw new ValidationError("S3(EcoDrive): 缺少 mount");
+
+    const { orgId, ownerType, ownerId } = this._ecoResolveOwner(ctx);
+    const scopeType = "mount";
+    const scopeId = String(mount.id);
+    const repo = new VfsNodesRepository(db, null);
+
+    const vfsPath = this._ecoSubPathToVfsPath(subPath, orgId);
+    if (vfsPath === "/") return { node: null, vfsPath, ownerType, ownerId, scopeType, scopeId, orgId };
+    const node = await repo.resolveNodeByPath({ ownerType, ownerId, scopeType, scopeId, path: vfsPath });
+    return { node, vfsPath, ownerType, ownerId, scopeType, scopeId, orgId };
   }
 
   /**
@@ -121,6 +243,16 @@ export class S3StorageDriver extends BaseDriver {
     }
 
     try {
+      if (this._isEcoDriveContext(ctx)) {
+        return await this._ecoListDirectory(s3SubPath, {
+          ...ctx,
+          mount,
+          db,
+          subPath: s3SubPath,
+          path: fsPath,
+        });
+      }
+
       // 委托给目录操作模块，传递所有选项参数
       return await this.directoryOps.listDirectory(s3SubPath, {
         mount,
@@ -162,6 +294,48 @@ export class S3StorageDriver extends BaseDriver {
         mount,
         path: fsPath,
       });
+    }
+
+    if (this._isEcoDriveContext(ctx)) {
+      const db2 = db || null;
+      if (!db2) throw new ValidationError("S3(EcoDrive).getFileInfo: 缺少 db");
+      if (!mount?.id) throw new ValidationError("S3(EcoDrive).getFileInfo: 缺少 mount");
+
+      const { node, vfsPath, ownerType, ownerId, scopeType, scopeId } = await this._ecoGetNodeByPath(s3SubPath, { ...ctx, mount, db: db2 });
+
+      // 根目录（/）在 VFS 中不占记录，逻辑上总是存在
+      if (vfsPath === "/" && !node) {
+        return await buildFileInfo({
+          fsPath,
+          name: fsPath.split("/").filter(Boolean).pop() || "/",
+          isDirectory: true,
+          size: null,
+          modified: null,
+          mimetype: "application/x-directory",
+          mount,
+          storageType: mount.storage_type || this.type,
+          db: db2,
+        });
+      }
+
+      if (!node) {
+        throw new NotFoundError("资源不存在");
+      }
+
+      const isDirectory = node.node_type === "dir";
+      const info = await buildFileInfo({
+        fsPath,
+        name: node.name,
+        isDirectory,
+        size: isDirectory ? null : node.size,
+        modified: node.updated_at || node.created_at || null,
+        mimetype: isDirectory ? "application/x-directory" : node.mime_type || "application/octet-stream",
+        mount,
+        storageType: mount.storage_type || this.type,
+        db: db2,
+      });
+
+      return { ...info, vfs_node_id: node.id, vfs_owner_type: ownerType, vfs_owner_id: ownerId, vfs_scope_type: scopeType, vfs_scope_id: scopeId };
     }
 
     try {
@@ -215,6 +389,26 @@ export class S3StorageDriver extends BaseDriver {
     const fileName = typeof fsPath === "string" ? fsPath.split("/").filter(Boolean).pop() || "file" : "file";
 
     try {
+      if (this._isEcoDriveContext(ctx)) {
+        const db2 = db || null;
+        if (!db2) throw new ValidationError("S3(EcoDrive).downloadFile: 缺少 db");
+        const { node, orgId } = await this._ecoGetNodeByPath(s3SubPath, { ...ctx, mount, db: db2 });
+        if (!node) throw new NotFoundError("文件不存在");
+        if (node.node_type !== "file") throw new ValidationError("目标不是文件");
+
+        const contentRef = String(node.content_ref || "");
+        const m = contentRef.match(/^blob:(.+)$/);
+        if (!m) throw new ValidationError("文件缺少 blob 引用");
+        const blobId = m[1];
+        const blob = await db2
+          .prepare(`SELECT * FROM drive_blobs WHERE id = ? AND org_id = ? AND deleted_at IS NULL LIMIT 1`)
+          .bind(blobId, orgId)
+          .first();
+        if (!blob) throw new NotFoundError("文件内容不存在");
+
+        return await this.fileOps.downloadFile(String(blob.storage_key), fileName, request);
+      }
+
       // 委托给文件操作模块
       return await this.fileOps.downloadFile(s3SubPath, fileName, request);
     } catch (error) {
@@ -318,6 +512,22 @@ export class S3StorageDriver extends BaseDriver {
     }
 
     try {
+      if (this._isEcoDriveContext(ctx)) {
+        const db2 = db || null;
+        if (!db2) throw new ValidationError("S3(EcoDrive).createDirectory: 缺少 db");
+        if (!mount?.id) throw new ValidationError("S3(EcoDrive).createDirectory: 缺少 mount");
+
+        const { orgId, ownerType, ownerId } = this._ecoResolveOwner(ctx);
+        const scopeType = "mount";
+        const scopeId = String(mount.id);
+        const repo = new VfsNodesRepository(db2, null);
+
+        const vfsPath = this._ecoSubPathToVfsPath(s3SubPath, orgId);
+        await repo.ensureDirectoryPath({ ownerType, ownerId, scopeType, scopeId, path: vfsPath });
+
+        return { success: true, path: fsPath, message: "目录创建成功" };
+      }
+
       // 委托给目录操作模块
       return await this.directoryOps.createDirectory(s3SubPath, {
         mount,
@@ -340,6 +550,61 @@ export class S3StorageDriver extends BaseDriver {
     this._ensureInitialized();
 
     try {
+      if (this._isEcoDriveContext(ctx)) {
+        const { db, mount } = ctx || {};
+        const oldPath = ctx?.oldPath;
+        const newPath = ctx?.newPath;
+        if (!db) throw new ValidationError("S3(EcoDrive).renameItem: 缺少 db");
+        if (!mount?.id) throw new ValidationError("S3(EcoDrive).renameItem: 缺少 mount");
+        if (typeof oldPath !== "string" || typeof newPath !== "string") {
+          throw new ValidationError("EcoDrive renameItem 需要 ctx.oldPath/ctx.newPath（FS 视图路径）");
+        }
+
+        const { orgId, ownerType, ownerId } = this._ecoResolveOwner(ctx);
+        const scopeType = "mount";
+        const scopeId = String(mount.id);
+        const repo = new VfsNodesRepository(db, null);
+
+        const oldVfsPath = this._ecoSubPathToVfsPath(normalizeS3SubPath(oldSubPath, false), orgId);
+        const newVfsPath = this._ecoSubPathToVfsPath(normalizeS3SubPath(newSubPath, false), orgId);
+
+        const node = await repo.resolveNodeByPath({ ownerType, ownerId, scopeType, scopeId, path: oldVfsPath });
+        if (!node) throw new NotFoundError("源文件或目录不存在");
+
+        const segments = newVfsPath.replace(/^\/+/, "").split("/").filter(Boolean);
+        if (segments.length === 0) throw new ValidationError("目标路径无效");
+        const newName = segments[segments.length - 1];
+        const parentSegments = segments.slice(0, -1);
+        const parentVfsPath = parentSegments.length ? `/${parentSegments.join("/")}` : "/";
+
+        let targetParentId = VFS_ROOT_PARENT_ID;
+        if (parentVfsPath !== "/") {
+          const parentNode = await repo.resolveNodeByPath({ ownerType, ownerId, scopeType, scopeId, path: parentVfsPath });
+          if (!parentNode) throw new NotFoundError("目标目录不存在");
+          if (parentNode.node_type !== "dir") throw new ValidationError("目标父级不是目录");
+          targetParentId = String(parentNode.id);
+        }
+
+        const conflict = await repo.getChildByName({ ownerType, ownerId, scopeType, scopeId, parentId: targetParentId, name: newName });
+        if (conflict && String(conflict.id) !== String(node.id)) {
+          throw new ValidationError("目标目录下已存在同名文件/文件夹");
+        }
+
+        const now = new Date().toISOString();
+        await db
+          .prepare(
+            `
+            UPDATE vfs_nodes
+            SET parent_id = ?, name = ?, updated_at = ?
+            WHERE id = ? AND owner_type = ? AND owner_id = ? AND scope_type = ? AND scope_id = ?
+            `,
+          )
+          .bind(targetParentId, newName, now, node.id, ownerType, ownerId, scopeType, scopeId)
+          .run();
+
+        return { success: true, source: oldPath, target: newPath, message: node.node_type === "dir" ? "目录重命名成功" : "文件重命名成功" };
+      }
+
       // 委托给批量操作模块
       return await this.batchOps.renameItem(oldSubPath, newSubPath, ctx);
     } catch (error) {
@@ -357,6 +622,68 @@ export class S3StorageDriver extends BaseDriver {
     this._ensureInitialized();
 
     try {
+      if (this._isEcoDriveContext(ctx)) {
+        const { db, mount } = ctx || {};
+        if (!db) throw new ValidationError("S3(EcoDrive).batchRemoveItems: 缺少 db");
+        if (!mount?.id) throw new ValidationError("S3(EcoDrive).batchRemoveItems: 缺少 mount");
+        if (!Array.isArray(subPaths) || subPaths.length === 0) return { success: 0, failed: [] };
+        if (!Array.isArray(ctx?.paths) || ctx.paths.length !== subPaths.length) {
+          throw new ValidationError("EcoDrive batchRemoveItems 需要 ctx.paths 与 subPaths 一一对应");
+        }
+
+        const { orgId, ownerType, ownerId, userId } = this._ecoResolveOwner(ctx);
+        const scopeType = "mount";
+        const scopeId = String(mount.id);
+        const repo = new VfsNodesRepository(db, null);
+
+        // 映射到 vfsPath，排序后只保留“最顶层”的删除目标（避免 parent+child 重复）
+        const items = subPaths
+          .map((sp, idx) => {
+            const norm = normalizeS3SubPath(sp, false);
+            const vfsPath = this._ecoSubPathToVfsPath(norm, orgId);
+            return { idx, vfsPath, fsPath: ctx.paths[idx] };
+          })
+          .sort((a, b) => a.vfsPath.length - b.vfsPath.length);
+
+        const selected = [];
+        for (const it of items) {
+          if (selected.some((s) => it.vfsPath === s.vfsPath || it.vfsPath.startsWith(`${s.vfsPath}/`))) continue;
+          selected.push(it);
+        }
+
+        const result = { success: 0, failed: [] };
+        const now = new Date();
+        const purgeAfter = new Date(now.getTime() + 30 * 24 * 3600 * 1000).toISOString();
+
+        for (const it of selected) {
+          try {
+            const node = await repo.resolveNodeByPath({ ownerType, ownerId, scopeType, scopeId, path: it.vfsPath });
+            if (!node) throw new NotFoundError("文件不存在");
+
+            // 递归软删子树 + 写入 drive_trash（顶层）
+            await repo.deleteNode({ ownerType, ownerId, scopeType, scopeId, nodeId: node.id, mode: "soft" });
+
+            await db
+              .prepare(
+                `
+                INSERT OR IGNORE INTO drive_trash
+                  (id, org_id, owner_type, owner_id, scope_type, scope_id, node_id, original_parent_id, original_name, deleted_by, deleted_at, purge_after)
+                VALUES
+                  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+                `,
+              )
+              .bind(`trash_${crypto.randomUUID()}`, orgId, ownerType, ownerId, scopeType, scopeId, node.id, node.parent_id ?? null, node.name ?? null, userId || null, purgeAfter)
+              .run();
+
+            result.success += 1;
+          } catch (e) {
+            result.failed.push({ path: it.fsPath, error: e?.message || "删除失败" });
+          }
+        }
+
+        return result;
+      }
+
       // 委托给批量操作模块
       return await this.batchOps.batchRemoveItems(subPaths, ctx);
     } catch (error) {
@@ -396,6 +723,94 @@ export class S3StorageDriver extends BaseDriver {
   async copyItem(sourceSubPath, targetSubPath, ctx = {}) {
     this._ensureInitialized();
     try {
+      if (this._isEcoDriveContext(ctx)) {
+        const { db, mount } = ctx || {};
+        const sourcePath = ctx?.sourcePath;
+        const targetPath = ctx?.targetPath;
+        if (!db) throw new ValidationError("S3(EcoDrive).copyItem: 缺少 db");
+        if (!mount?.id) throw new ValidationError("S3(EcoDrive).copyItem: 缺少 mount");
+        if (typeof sourcePath !== "string" || typeof targetPath !== "string") {
+          throw new ValidationError("EcoDrive copyItem 需要 ctx.sourcePath/ctx.targetPath（FS 视图路径）");
+        }
+
+        const { orgId, ownerType, ownerId } = this._ecoResolveOwner(ctx);
+        const scopeType = "mount";
+        const scopeId = String(mount.id);
+        const repo = new VfsNodesRepository(db, null);
+
+        const srcVfsPath = this._ecoSubPathToVfsPath(normalizeS3SubPath(sourceSubPath, false), orgId);
+        const dstVfsPath = this._ecoSubPathToVfsPath(normalizeS3SubPath(targetSubPath, false), orgId);
+
+        const srcNode = await repo.resolveNodeByPath({ ownerType, ownerId, scopeType, scopeId, path: srcVfsPath });
+        if (!srcNode) throw new NotFoundError("源文件或目录不存在");
+
+        const dstSegments = dstVfsPath.replace(/^\/+/, "").split("/").filter(Boolean);
+        if (dstSegments.length === 0) throw new ValidationError("目标路径无效");
+        const dstName = dstSegments[dstSegments.length - 1];
+        const dstParentVfs = dstSegments.length > 1 ? `/${dstSegments.slice(0, -1).join("/")}` : "/";
+
+        let dstParentId = VFS_ROOT_PARENT_ID;
+        if (dstParentVfs !== "/") {
+          const parentNode = await repo.resolveNodeByPath({ ownerType, ownerId, scopeType, scopeId, path: dstParentVfs });
+          if (!parentNode) throw new NotFoundError("目标目录不存在");
+          if (parentNode.node_type !== "dir") throw new ValidationError("目标父级不是目录");
+          dstParentId = String(parentNode.id);
+        }
+
+        const conflict = await repo.getChildByName({ ownerType, ownerId, scopeType, scopeId, parentId: dstParentId, name: dstName });
+        if (conflict) throw new ValidationError("目标目录下已存在同名文件/文件夹");
+
+        const nowIso = new Date().toISOString();
+        const cloneSubtree = async (node, newParentId, newName) => {
+          const newId = `vfs_${crypto.randomUUID()}`;
+          await db
+            .prepare(
+              `
+              INSERT INTO vfs_nodes
+                (id, owner_type, owner_id, scope_type, scope_id, parent_id, name, node_type, mime_type, size, hash_algo, hash_value, status, storage_type, content_ref, created_at, updated_at)
+              VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+              `,
+            )
+            .bind(
+              newId,
+              ownerType,
+              ownerId,
+              scopeType,
+              scopeId,
+              newParentId,
+              newName,
+              node.node_type,
+              node.mime_type ?? null,
+              node.size ?? null,
+              node.hash_algo ?? null,
+              node.hash_value ?? null,
+              node.storage_type ?? "VFS",
+              node.content_ref ?? null,
+              nowIso,
+              nowIso,
+            )
+            .run();
+
+          if (node.node_type === "file") {
+            const m = String(node.content_ref || "").match(/^blob:(.+)$/);
+            if (m) {
+              await db.prepare(`UPDATE drive_blobs SET ref_count = ref_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND org_id = ?`).bind(m[1], orgId).run();
+            }
+            return;
+          }
+
+          const children = await repo.listChildrenByParentId({ ownerType, ownerId, scopeType, scopeId, parentId: String(node.id) });
+          for (const child of children) {
+            await cloneSubtree(child, newId, child.name);
+          }
+        };
+
+        await cloneSubtree(srcNode, dstParentId, dstName);
+
+        return { success: true, source: sourcePath, target: targetPath, message: srcNode.node_type === "dir" ? "目录复制成功" : "文件复制成功" };
+      }
+
       // 委托给批量操作模块
       return await this.batchOps.copyItem(sourceSubPath, targetSubPath, ctx);
     } catch (error) {
@@ -416,6 +831,33 @@ export class S3StorageDriver extends BaseDriver {
 
     try {
       const { expiresIn, forceDownload, userType, userId, mount } = ctx;
+      if (this._isEcoDriveContext(ctx)) {
+        const { db } = ctx || {};
+        if (!db) throw new ValidationError("S3(EcoDrive).generateDownloadUrl: 缺少 db");
+        if (!mount?.id) throw new ValidationError("S3(EcoDrive).generateDownloadUrl: 缺少 mount");
+
+        const { node, orgId } = await this._ecoGetNodeByPath(s3SubPath, { ...ctx, mount, db });
+        if (!node) throw new NotFoundError("文件不存在");
+        if (node.node_type !== "file") throw new ValidationError("目标不是文件");
+
+        const contentRef = String(node.content_ref || "");
+        const m = contentRef.match(/^blob:(.+)$/);
+        if (!m) throw new ValidationError("文件缺少 blob 引用");
+
+        const blob = await db
+          .prepare(`SELECT * FROM drive_blobs WHERE id = ? AND org_id = ? AND deleted_at IS NULL LIMIT 1`)
+          .bind(m[1], orgId)
+          .first();
+        if (!blob) throw new NotFoundError("文件内容不存在");
+
+        return await this.fileOps.generateDownloadUrl(String(blob.storage_key), {
+          expiresIn,
+          forceDownload,
+          userType,
+          userId,
+          mount,
+        });
+      }
       return await this.fileOps.generateDownloadUrl(s3SubPath, {
         expiresIn,
         forceDownload,
@@ -650,23 +1092,24 @@ export class S3StorageDriver extends BaseDriver {
   async initializeFrontendMultipartUpload(subPath, options = {}) {
     this._ensureInitialized();
 
-    const { fileName, fileSize, partSize = 5 * 1024 * 1024, partCount, mount, db, userIdOrInfo, userType } = options;
-
     // 规范化S3子路径
     const s3SubPath = normalizeS3SubPath(subPath, false);
 
     try {
+      const merged = { ...(options && typeof options === "object" ? options : {}), rawSubPath: subPath };
+
+      if (this._isEcoDriveContext(merged)) {
+        const orgId = this._getEcoOrgId(merged);
+        const sha256Raw = typeof merged.sha256 === "string" ? merged.sha256.trim() : "";
+        const sha256 = sha256Raw || `nohash_${crypto.randomUUID()}`;
+        merged.sha256 = sha256;
+        merged.finalKeyOverride = `org/${orgId}/blobs/${sha256}`;
+        merged.ecoDrive = { orgId };
+      }
+
       // 委托给上传操作模块
       return await this.uploadOps.initializeFrontendMultipartUpload(s3SubPath, {
-        fileName,
-        fileSize,
-        partSize,
-        partCount,
-        mount,
-        db,
-        userIdOrInfo,
-        userType,
-        rawSubPath: subPath,
+        ...merged,
       });
     } catch (error) {
       throw this._rethrow(error, "初始化分片上传失败");

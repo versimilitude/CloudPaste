@@ -22,6 +22,7 @@ import {
   listActiveUploadSessions,
   updateUploadSessionById,
 } from "../../../../utils/uploadSessions.js";
+import { VfsNodesRepository, VFS_ROOT_PARENT_ID } from "../../../../repositories/VfsNodesRepository.js";
 
 const DEFAULT_S3_MULTIPART_CONCURRENCY = 3;
 
@@ -406,7 +407,7 @@ export class S3UploadOperations {
    * @returns {Promise<Object>} 初始化结果
    */
   async initializeFrontendMultipartUpload(s3SubPath, options = {}) {
-    const { fileName, fileSize, partSize = 5 * 1024 * 1024, partCount, mount, db, userIdOrInfo, userType } = options;
+    const { fileName, fileSize, partSize = 5 * 1024 * 1024, partCount, mount, db, userIdOrInfo, userType, sha256, contentType, finalKeyOverride, ecoDrive } = options;
 
     console.log("[S3UploadOperations] 初始化分片上传", { fileName, fileSize, mountId: mount?.id });
 
@@ -425,9 +426,9 @@ export class S3UploadOperations {
         throw new ValidationError("S3 分片上传初始化失败：fileName 不能为空");
       }
 
-      const contentType =
-        typeof options?.contentType === "string" && options.contentType
-          ? String(options.contentType)
+      const resolvedContentType =
+        typeof contentType === "string" && contentType
+          ? String(contentType)
           : getMimeTypeFromFilename(normalizedFileName);
 
       // 计算分片大小
@@ -468,16 +469,18 @@ export class S3UploadOperations {
         throw new ValidationError(`S3 分片上传初始化失败：分片数量超过上限（${MAX_PARTS}），请增大分片大小或限制文件尺寸`);
       }
 
-      // 生成最终的 S3 Key（不带前导 /）
+      // 生成最终的 S3 Key（可由上层覆盖；并统一应用 root_prefix）
       const base = String(s3SubPath || "").replace(/\/+$/g, "");
-      const finalS3Key = base ? `${base}/${normalizedFileName}` : normalizedFileName;
+      const fallbackKey = base ? `${base}/${normalizedFileName}` : normalizedFileName;
+      const overrideKey = typeof finalKeyOverride === "string" && finalKeyOverride.trim() ? finalKeyOverride.trim() : null;
+      const finalS3Key = applyS3RootPrefix(this.config, overrideKey || fallbackKey);
 
       // 创建 S3 Multipart Upload（providerUploadId）
       const { CreateMultipartUploadCommand, UploadPartCommand } = await import("@aws-sdk/client-s3");
       const createCommand = new CreateMultipartUploadCommand({
         Bucket: this.config.bucket_name,
         Key: finalS3Key,
-        ContentType: contentType,
+        ContentType: resolvedContentType,
       });
       const createResponse = await this.s3Client.send(createCommand);
       const providerUploadId = String(createResponse?.UploadId || "").trim();
@@ -539,6 +542,8 @@ export class S3UploadOperations {
       const providerMeta = JSON.stringify({
         bucket: this.config.bucket_name,
         key: finalS3Key,
+        sha256: typeof sha256 === "string" && sha256 ? sha256 : null,
+        ecoDrive: ecoDrive && typeof ecoDrive === "object" ? ecoDrive : null,
         urlTtlSeconds: signatureExpiresIn,
         maxPartsPerRequest,
         multipartConcurrency,
@@ -554,8 +559,8 @@ export class S3UploadOperations {
         source: "FS",
         fileName: normalizedFileName,
         fileSize: Number(fileSize),
-        mimeType: contentType || null,
-        checksum: null,
+        mimeType: resolvedContentType || null,
+        checksum: typeof sha256 === "string" && sha256 ? sha256 : null,
         fingerprintAlgo: fingerprint.algo,
         fingerprintValue: fingerprint.value,
         strategy: "per_part_url",
@@ -606,10 +611,8 @@ export class S3UploadOperations {
    * @returns {Promise<Object>} 完成结果
    */
   async completeFrontendMultipartUpload(s3SubPath, options = {}) {
-    const { uploadId, parts, fileName, fileSize, mount, db, userIdOrInfo, userType } = options;
+    const { uploadId, parts, fileName, fileSize, mount, db, userIdOrInfo, userType, conflictStrategy = null } = options;
     void s3SubPath;
-    void userIdOrInfo;
-    void userType;
 
     console.log("[S3UploadOperations] 完成分片上传", {
       fileName,
@@ -712,6 +715,238 @@ export class S3UploadOperations {
           console.warn("[S3UploadOperations] 更新 upload_sessions 状态为 completed 失败:", e?.message || e);
         }
 
+        const cleanedEtag = completeResponse.ETag ? String(completeResponse.ETag).replace(/"/g, "") : null;
+
+        // ===========================
+        // EcoDrive（方案 B：VFS + blob）
+        // ===========================
+        let vfsNodeId = null;
+        let vfsEffectiveName = sessionRow.file_name || fileName || null;
+
+        const ecoOrgIdRaw = meta?.ecoDrive?.orgId ?? userIdOrInfo?.ecoOrgId ?? null;
+        const ecoOrgId = Number(ecoOrgIdRaw);
+        if (Number.isFinite(ecoOrgId) && ecoOrgId > 0 && mount?.id) {
+          const orgId = ecoOrgId;
+          const ownerType = "eco_org";
+          const ownerId = `org:${orgId}`;
+          const scopeType = "mount";
+          const scopeId = String(mount.id);
+          const repo = new VfsNodesRepository(db, null);
+
+          const shaRaw =
+            (typeof sessionRow.checksum === "string" && sessionRow.checksum.trim()) ||
+            (typeof meta?.sha256 === "string" && meta.sha256.trim()) ||
+            (typeof options?.sha256 === "string" && options.sha256.trim()) ||
+            "";
+          const sha256 = shaRaw || `nohash_${crypto.randomUUID()}`;
+
+          const size = Math.max(Number(sessionRow.file_size) || 0, Number(fileSize) || 0);
+
+          // 1) upsert blob（按 org+sha 去重；storage_key 使用最终的 S3 Key）
+          const existingBlob = await db
+            .prepare(`SELECT * FROM drive_blobs WHERE org_id = ? AND sha256 = ? AND deleted_at IS NULL LIMIT 1`)
+            .bind(orgId, sha256)
+            .first();
+
+          let blobId = existingBlob?.id ? String(existingBlob.id) : null;
+          if (!blobId) {
+            blobId = `blob_${crypto.randomUUID()}`;
+            await db
+              .prepare(
+                `
+                INSERT INTO drive_blobs
+                  (id, org_id, sha256, storage_type, storage_key, size, mime_type, etag, ref_count, created_by, created_at, updated_at)
+                VALUES
+                  (?, ?, ?, 'S3', ?, ?, ?, ?, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                `,
+              )
+              .bind(
+                blobId,
+                orgId,
+                sha256,
+                finalS3Path,
+                size,
+                contentType || null,
+                cleanedEtag,
+                String(userIdOrInfo?.id || userIdOrInfo?.sub || userIdOrInfo?.userId || ""),
+              )
+              .run();
+          } else {
+            await db
+              .prepare(
+                `
+                UPDATE drive_blobs
+                SET storage_key = ?, size = ?, mime_type = ?, etag = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND org_id = ?
+                `,
+              )
+              .bind(finalS3Path, size, contentType || null, cleanedEtag, blobId, orgId)
+              .run();
+          }
+
+          // 2) 解析目标 VFS 路径（来自 upload_sessions.fs_path）
+          const mountPath = String(mount?.mount_path || "/").replace(/\/+$/g, "") || "/";
+          let relFs = String(sessionRow.fs_path || "");
+          if (mountPath !== "/" && relFs.startsWith(mountPath)) {
+            relFs = relFs.slice(mountPath.length);
+          }
+          relFs = relFs.replace(/^\/+/, "");
+          const relSeg = relFs.split("/").filter(Boolean);
+          if (relSeg.length < 3 || relSeg[0] !== "org" || String(relSeg[1]) !== String(orgId)) {
+            throw new ValidationError("EcoDrive: 上传目标路径无效（org 不匹配）");
+          }
+          const vfsSeg = relSeg.slice(2);
+          if (vfsSeg.length === 0) {
+            throw new ValidationError("EcoDrive: 上传目标路径无效");
+          }
+          const targetName = vfsSeg[vfsSeg.length - 1];
+          const dirSeg = vfsSeg.slice(0, -1);
+          const dirVfsPath = dirSeg.length ? `/${dirSeg.join("/")}` : "/";
+
+          // 3) 确保父目录存在
+          await repo.ensureDirectoryPath({ ownerType, ownerId, scopeType, scopeId, path: dirVfsPath });
+          let parentId = VFS_ROOT_PARENT_ID;
+          if (dirVfsPath !== "/") {
+            const dirNode = await repo.resolveNodeByPath({ ownerType, ownerId, scopeType, scopeId, path: dirVfsPath });
+            if (!dirNode || dirNode.node_type !== "dir") {
+              throw new ValidationError("EcoDrive: 目标目录不存在");
+            }
+            parentId = String(dirNode.id);
+          }
+
+          const pickNonConflictingName = async (name) => {
+            const raw = String(name || "").trim();
+            if (!raw) return "untitled";
+            const dot = raw.lastIndexOf(".");
+            const stem = dot > 0 ? raw.slice(0, dot) : raw;
+            const ext = dot > 0 ? raw.slice(dot) : "";
+            for (let i = 1; i <= 1000; i += 1) {
+              const candidate = `${stem} (${i})${ext}`;
+              const exists = await repo.getChildByName({ ownerType, ownerId, scopeType, scopeId, parentId, name: candidate });
+              if (!exists || exists.status !== "active") return candidate;
+            }
+            return `${stem} (${Date.now()})${ext}`;
+          };
+
+          const existing = await repo.getChildByName({ ownerType, ownerId, scopeType, scopeId, parentId, name: targetName });
+          const existingActive = existing && existing.status === "active" ? existing : null;
+          const strategy = typeof conflictStrategy === "string" && conflictStrategy ? conflictStrategy : "rename";
+
+          const updateBlobRef = async (id, delta) => {
+            if (!id) return;
+            await db
+              .prepare(`UPDATE drive_blobs SET ref_count = ref_count + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND org_id = ?`)
+              .bind(delta, id, orgId)
+              .run();
+          };
+
+          const addVersionIfNeeded = async (fileNode, oldBlobId, note) => {
+            if (!oldBlobId) return;
+            const maxRow = await db
+              .prepare(`SELECT COALESCE(MAX(version_no), 0) AS max_no FROM drive_file_versions WHERE file_node_id = ?`)
+              .bind(String(fileNode.id))
+              .first();
+            const nextNo = Number(maxRow?.max_no || 0) + 1;
+
+            const oldBlob = await db
+              .prepare(`SELECT * FROM drive_blobs WHERE id = ? AND org_id = ? AND deleted_at IS NULL LIMIT 1`)
+              .bind(oldBlobId, orgId)
+              .first();
+
+            await db
+              .prepare(
+                `
+                INSERT INTO drive_file_versions
+                  (id, file_node_id, version_no, org_id, blob_id, sha256, storage_key, size, mime_type, note, created_by, created_at)
+                VALUES
+                  (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                `,
+              )
+              .bind(
+                `ver_${crypto.randomUUID()}`,
+                String(fileNode.id),
+                nextNo,
+                orgId,
+                oldBlobId,
+                oldBlob?.sha256 ? String(oldBlob.sha256) : null,
+                oldBlob?.storage_key ? String(oldBlob.storage_key) : null,
+                oldBlob?.size != null ? Number(oldBlob.size) : null,
+                oldBlob?.mime_type ? String(oldBlob.mime_type) : null,
+                note || null,
+                String(userIdOrInfo?.id || userIdOrInfo?.sub || userIdOrInfo?.userId || ""),
+              )
+              .run();
+
+            // 版本持有 blob：ref_count + 1
+            await updateBlobRef(oldBlobId, +1);
+
+            // 只保留最近 10 个版本：删除超出部分，并同步 ref_count
+            const versions = await db
+              .prepare(`SELECT id, blob_id FROM drive_file_versions WHERE file_node_id = ? ORDER BY version_no DESC`)
+              .bind(String(fileNode.id))
+              .all();
+            const rows = versions?.results || [];
+            if (rows.length > 10) {
+              const toDelete = rows.slice(10);
+              for (const r of toDelete) {
+                await db.prepare(`DELETE FROM drive_file_versions WHERE id = ?`).bind(String(r.id)).run();
+                if (r.blob_id) await updateBlobRef(String(r.blob_id), -1);
+              }
+            }
+          };
+
+          if (existingActive && existingActive.node_type === "file" && strategy === "overwrite") {
+            const oldRef = String(existingActive.content_ref || "");
+            const oldBlobId = oldRef.startsWith("blob:") ? oldRef.slice("blob:".length) : null;
+
+            if (oldBlobId && oldBlobId !== blobId) {
+              await addVersionIfNeeded(existingActive, oldBlobId, "覆盖上传自动版本");
+            }
+
+            const nowIso = new Date().toISOString();
+            await db
+              .prepare(
+                `
+                UPDATE vfs_nodes
+                SET content_ref = ?, storage_type = 'S3', size = ?, mime_type = ?, hash_algo = 'sha256', hash_value = ?, updated_at = ?
+                WHERE id = ? AND owner_type = ? AND owner_id = ? AND scope_type = ? AND scope_id = ?
+                `,
+              )
+              .bind(`blob:${blobId}`, size, contentType || null, sha256, nowIso, String(existingActive.id), ownerType, ownerId, scopeType, scopeId)
+              .run();
+
+            // 节点改绑新 blob：old -1, new +1
+            if (oldBlobId && oldBlobId !== blobId) {
+              await updateBlobRef(oldBlobId, -1);
+              await updateBlobRef(blobId, +1);
+            } else if (!oldBlobId) {
+              await updateBlobRef(blobId, +1);
+            }
+
+            vfsNodeId = String(existingActive.id);
+            vfsEffectiveName = targetName;
+          } else {
+            const finalName = existingActive ? await pickNonConflictingName(targetName) : targetName;
+            const id = `vfs_${crypto.randomUUID()}`;
+            const nowIso = new Date().toISOString();
+            await db
+              .prepare(
+                `
+                INSERT INTO vfs_nodes
+                  (id, owner_type, owner_id, scope_type, scope_id, parent_id, name, node_type, mime_type, size, hash_algo, hash_value, status, storage_type, content_ref, created_at, updated_at)
+                VALUES
+                  (?, ?, ?, ?, ?, ?, ?, 'file', ?, ?, 'sha256', ?, 'active', 'S3', ?, ?, ?)
+                `,
+              )
+              .bind(id, ownerType, ownerId, scopeType, scopeId, parentId, finalName, contentType || null, size, sha256, `blob:${blobId}`, nowIso, nowIso)
+              .run();
+
+            await updateBlobRef(blobId, +1);
+            vfsNodeId = id;
+            vfsEffectiveName = finalName;
+          }
+        }
+
         return {
           success: true,
           fileName: sessionRow.file_name || fileName,
@@ -719,9 +954,11 @@ export class S3UploadOperations {
           contentType: contentType,
           storagePath: finalS3Path,
           publicUrl: s3Url,
-          etag: completeResponse.ETag ? completeResponse.ETag.replace(/"/g, "") : null,
+          etag: cleanedEtag,
           location: completeResponse.Location,
           message: "前端分片上传完成",
+          vfsNodeId,
+          vfsEffectiveName,
         };
       },
       "完成前端分片上传",

@@ -10,6 +10,7 @@ import { registerWriteRoutes } from "./fs/write.js";
 import { registerMultipartRoutes } from "./fs/multipart.js";
 import { registerOpsRoutes } from "./fs/ops.js";
 import { registerSearchShareRoutes } from "./fs/search_share.js";
+import { registerDriveRoutes } from "./fs/drive.js";
 import { FsMetaService } from "../services/fsMetaService.js";
 import { encryptValue, decryptValue } from "../utils/crypto.js";
 import { getEncryptionSecret } from "../utils/environmentUtils.js";
@@ -345,6 +346,7 @@ registerWriteRoutes(fsRoutes, sharedContext);
 registerMultipartRoutes(fsRoutes, sharedContext);
 registerOpsRoutes(fsRoutes, sharedContext);
 registerSearchShareRoutes(fsRoutes, sharedContext);
+registerDriveRoutes(fsRoutes, sharedContext);
 
 
 export default fsRoutes;

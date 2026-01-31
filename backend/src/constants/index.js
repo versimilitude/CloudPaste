@@ -28,6 +28,13 @@ export const DbTables = {
   UPLOAD_SESSIONS: "upload_sessions", // 通用上传会话表（前端分片/断点续传）
   UPLOAD_PARTS: "upload_parts", // 上传分片明细表（临时账本，一片一行）
   VFS_NODES: "vfs_nodes", // 虚拟目录树索引表（长期目录树/条目）
+
+  // Drive (Eco) - scheme B: D1 VFS as source of truth
+  DRIVE_BLOBS: "drive_blobs", // 去重后的内容对象（按 org + sha256）
+  DRIVE_FILE_VERSIONS: "drive_file_versions", // 文件历史版本（最多 10）
+  DRIVE_TRASH: "drive_trash", // 回收站（30 天自动清理）
+  DRIVE_NODE_META: "drive_node_meta", // 文件/文件夹扩展属性（对接档案管理）
+  DRIVE_PINS: "drive_pins", // 快速访问（固定/收藏）
 };
 
 // 默认的最大上传大小（MB）

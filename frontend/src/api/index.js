@@ -17,6 +17,7 @@ import * as systemService from "./services/systemService";
 import * as urlUploadService from "./services/urlUploadService";
 import * as fsService from "./services/fsService";
 import * as fsIndexService from "./services/fsIndexService";
+import * as driveService from "./services/driveService";
 
 // 统一服务导出 - 按功能模块重新组织
 export const api = {
@@ -63,6 +64,11 @@ export const api = {
   // 文件系统相关 - 统一API，自动根据认证信息处理用户类型
   fs: {
     ...fsService,
+  },
+
+  // Eco-drive extensions (Scheme B)
+  drive: {
+    ...driveService,
   },
 
   // 兼容性导出 - 保持向后兼容

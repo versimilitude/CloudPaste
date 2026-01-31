@@ -362,6 +362,7 @@ export default {
     contextMenu: {
       addToBasket: "添加到文件篮",
       addToQuickAccess: "添加至快速访问",
+      versions: "版本历史",
       batchDownload: "批量下载",
       batchCopy: "批量复制",
       batchAddToBasket: "批量添加到文件篮",

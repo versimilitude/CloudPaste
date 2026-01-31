@@ -34,7 +34,7 @@ const safeJsonStringify = (value) => {
 
 export class VfsNodesRepository extends BaseRepository {
   async listChildrenByParentId(params) {
-    const { ownerType, ownerId, scopeType, scopeId, parentId } = params || {};
+    const { ownerType, ownerId, scopeType, scopeId, parentId, includeDeleted = false } = params || {};
     if (!ownerType || !ownerId || !scopeType || !scopeId) {
       throw new ValidationError("listChildrenByParentId: 缺少 ownerType/ownerId/scopeType/scopeId");
     }
@@ -49,7 +49,7 @@ export class VfsNodesRepository extends BaseRepository {
         AND scope_type = ?
         AND scope_id = ?
         AND parent_id = ?
-        AND status = 'active'
+        ${includeDeleted ? "" : "AND status = 'active'"}
       ORDER BY node_type ASC, name ASC
       `,
       [ownerType, ownerId, scopeType, scopeId, pid],
@@ -59,7 +59,7 @@ export class VfsNodesRepository extends BaseRepository {
   }
 
   async getChildByName(params) {
-    const { ownerType, ownerId, scopeType, scopeId, parentId, name } = params || {};
+    const { ownerType, ownerId, scopeType, scopeId, parentId, name, includeDeleted = false } = params || {};
     if (!ownerType || !ownerId || !scopeType || !scopeId) {
       throw new ValidationError("getChildByName: 缺少 ownerType/ownerId/scopeType/scopeId");
     }
@@ -78,6 +78,7 @@ export class VfsNodesRepository extends BaseRepository {
         AND scope_id = ?
         AND parent_id = ?
         AND name = ?
+        ${includeDeleted ? "" : "AND status = 'active'"}
       LIMIT 1
       `,
       [ownerType, ownerId, scopeType, scopeId, pid, name],
@@ -393,14 +394,33 @@ export class VfsNodesRepository extends BaseRepository {
 
     if (mode === "soft") {
       const now = new Date().toISOString();
-      const result = await this.execute(
-        `
+      const sql = `
+        WITH RECURSIVE subtree(id) AS (
+          SELECT id
+          FROM ${DbTables.VFS_NODES}
+          WHERE id = ? AND owner_type = ? AND owner_id = ? AND scope_type = ? AND scope_id = ?
+          UNION ALL
+          SELECT v.id
+          FROM ${DbTables.VFS_NODES} v
+          JOIN subtree s ON v.parent_id = s.id
+          WHERE v.owner_type = ? AND v.owner_id = ? AND v.scope_type = ? AND v.scope_id = ?
+        )
         UPDATE ${DbTables.VFS_NODES}
         SET status = 'deleted', updated_at = ?
-        WHERE id = ? AND owner_type = ? AND owner_id = ? AND scope_type = ? AND scope_id = ?
-        `,
-        [now, nodeId, ownerType, ownerId, scopeType, scopeId],
-      );
+        WHERE id IN (SELECT id FROM subtree)
+      `;
+      const result = await this.execute(sql, [
+        nodeId,
+        ownerType,
+        ownerId,
+        scopeType,
+        scopeId,
+        ownerType,
+        ownerId,
+        scopeType,
+        scopeId,
+        now,
+      ]);
       return { changes: result?.meta?.changes ?? result?.changes ?? 0 };
     }
 
@@ -432,6 +452,42 @@ export class VfsNodesRepository extends BaseRepository {
       scopeId,
     ]);
 
+    return { changes: result?.meta?.changes ?? result?.changes ?? 0 };
+  }
+
+  async restoreNode(params) {
+    const { ownerType, ownerId, scopeType, scopeId, nodeId } = params || {};
+    if (!ownerType || !ownerId || !scopeType || !scopeId || !nodeId) {
+      throw new ValidationError("restoreNode: 缺少 ownerType/ownerId/scopeType/scopeId/nodeId");
+    }
+    const now = new Date().toISOString();
+    const sql = `
+      WITH RECURSIVE subtree(id) AS (
+        SELECT id
+        FROM ${DbTables.VFS_NODES}
+        WHERE id = ? AND owner_type = ? AND owner_id = ? AND scope_type = ? AND scope_id = ?
+        UNION ALL
+        SELECT v.id
+        FROM ${DbTables.VFS_NODES} v
+        JOIN subtree s ON v.parent_id = s.id
+        WHERE v.owner_type = ? AND v.owner_id = ? AND v.scope_type = ? AND v.scope_id = ?
+      )
+      UPDATE ${DbTables.VFS_NODES}
+      SET status = 'active', updated_at = ?
+      WHERE id IN (SELECT id FROM subtree)
+    `;
+    const result = await this.execute(sql, [
+      nodeId,
+      ownerType,
+      ownerId,
+      scopeType,
+      scopeId,
+      ownerType,
+      ownerId,
+      scopeType,
+      scopeId,
+      now,
+    ]);
     return { changes: result?.meta?.changes ?? result?.changes ?? 0 };
   }
 

@@ -11,6 +11,7 @@ import {
   createUploadPartsTables,
   createUploadSessionsTables,
   createVfsTables,
+  createDriveTables,
   createMetricsCacheTables,
 } from "./schema.js";
 import {
@@ -826,6 +827,13 @@ export async function runLegacyMigrationByVersion(db, version) {
         console.warn("版本34：归一化 storage_configs 布尔字段失败（可忽略，将由后续保存配置逐步修复）：", e?.message || e);
       }
 
+      break;
+    }
+
+    case 35: {
+      console.log("版本35：新增 Drive（Eco）所需表：blobs / versions / trash / meta / pins ...");
+      await createDriveTables(db);
+      console.log("版本35：Drive 表检查/创建完成。");
       break;
     }
 

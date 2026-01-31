@@ -51,6 +51,16 @@
         @task-completed="handleTaskCompleted"
       />
 
+      <FileVersionsModal
+        v-if="versionsModalOpen"
+        :is-open="versionsModalOpen"
+        :dark-mode="darkMode"
+        :base-path="effectiveBasicPath"
+        :file-item="versionsModalItem"
+        @close="versionsModalOpen = false"
+        @restored="handleVersionRestored"
+      />
+
       <!-- æ°å»ºæä»¶å¤¹å¼¹çª?-->
       <InputDialog
         :is-open="showCreateFolderDialog"
@@ -141,34 +151,49 @@
           class="mount-toolbar flex items-center justify-between gap-3 px-4 pt-3 pb-2 border-b"
           :class="darkMode ? 'border-gray-700' : 'border-gray-200'"
         >
-          <BreadcrumbNav
-            :current-path="currentViewPath"
-            :dark-mode="darkMode"
-            @navigate="handleNavigate"
-            @prefetch="handlePrefetch"
-            :basic-path="effectiveBasicPath"
-            :user-type="breadcrumbUserType"
-          />
-
-          <div class="shrink-0">
-            <FileOperations
-              :current-path="currentPath"
-              :is-virtual="isVirtualDirectory"
+          <template v-if="isTrashView">
+            <div class="flex items-center justify-between w-full gap-3">
+              <div class="text-sm font-medium" :class="darkMode ? 'text-gray-100' : 'text-gray-900'">回收站</div>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                :class="darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-100' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'"
+                @click="closeTrashView"
+              >
+                返回文件列表
+              </button>
+            </div>
+          </template>
+          <template v-else>
+            <BreadcrumbNav
+              :current-path="currentViewPath"
               :dark-mode="darkMode"
-              :view-mode="viewMode"
-              :selected-items="selectedItems"
-              @create-folder="handleCreateFolder"
-              @refresh="handleRefresh"
-              @change-view-mode="handleViewModeChange"
-              @openUploadModal="handleOpenUploadModal"
-              @openCopyModal="handleBatchCopy"
-              @openTasksModal="handleOpenTasksModal"
-              @openSearchModal="handleOpenSearchModal"
-              @openSettingsDrawer="handleOpenSettingsDrawer"
-              @task-created="handleTaskCreated"
-              @show-message="handleShowMessage"
+              @navigate="handleNavigate"
+              @prefetch="handlePrefetch"
+              :basic-path="effectiveBasicPath"
+              :user-type="breadcrumbUserType"
             />
-          </div>
+
+            <div class="shrink-0">
+              <FileOperations
+                :current-path="currentPath"
+                :is-virtual="isVirtualDirectory"
+                :dark-mode="darkMode"
+                :view-mode="viewMode"
+                :selected-items="selectedItems"
+                @create-folder="handleCreateFolder"
+                @refresh="handleRefresh"
+                @change-view-mode="handleViewModeChange"
+                @openUploadModal="handleOpenUploadModal"
+                @openCopyModal="handleBatchCopy"
+                @openTasksModal="handleOpenTasksModal"
+                @openSearchModal="handleOpenSearchModal"
+                @openSettingsDrawer="handleOpenSettingsDrawer"
+                @task-created="handleTaskCreated"
+                @show-message="handleShowMessage"
+              />
+            </div>
+          </template>
         </div>
         <Transition name="fade-slide" mode="out-in" @before-enter="handleContentBeforeEnter">
           <!-- æä»¶åè¡¨æ¨¡å¼ -->
@@ -182,20 +207,25 @@
               :dark-mode="darkMode"
               @navigate="handleNavigate"
               @prefetch="handlePrefetch"
+              @open-trash="openTrashView"
             />
 
             <div class="flex-1 min-w-0 p-4">
-              <PathPasswordDialog
-              v-if="pathPassword.showPasswordDialog.value"
-              :is-open="pathPassword.showPasswordDialog.value"
-              :path="pathPassword.pendingPath.value || currentPath"
-              :dark-mode="darkMode"
-              :inline="true"
-              @verified="handlePasswordVerified"
-              @cancel="handlePasswordCancel"
-              @close="handlePasswordClose"
-              @error="handlePasswordError"
-            />
+              <template v-if="isTrashView">
+                <DriveTrashView :base-path="effectiveBasicPath" :dark-mode="darkMode" />
+              </template>
+              <template v-else>
+                <PathPasswordDialog
+                  v-if="pathPassword.showPasswordDialog.value"
+                  :is-open="pathPassword.showPasswordDialog.value"
+                  :path="pathPassword.pendingPath.value || currentPath"
+                  :dark-mode="darkMode"
+                  :inline="true"
+                  @verified="handlePasswordVerified"
+                  @cancel="handlePasswordCancel"
+                  @close="handlePasswordClose"
+                  @error="handlePasswordError"
+                />
 
             <template v-else>
               <!-- éé»å¡éè¯¯æç¤ºï¼ä¸åç?error ç´æ¥æ¿æ¢æ´ä¸ªåè¡¨åºå -->
@@ -260,6 +290,7 @@
                 />
               </div>
             </template>
+              </template>
             </div>
           </div>
 
@@ -349,7 +380,7 @@
 
     <!-- æ¬æµ®æä½æ ?(å½æéä¸­é¡¹æ¶æ¾ç¤º) -->
     <FloatingActionBar
-      v-if="hasPermission && selectedCount > 0"
+      v-if="!isTrashView && hasPermission && selectedCount > 0"
       :selected-count="selectedCount"
       :dark-mode="darkMode"
       @download="handleBatchDownload"
@@ -363,7 +394,7 @@
 
     <!-- æµ®å¨å·¥å·æ ?(å³ä¸è§å¿«æ·æä½? -->
     <FloatingToolbar
-      v-if="hasPermission"
+      v-if="!isTrashView && hasPermission"
       :dark-mode="darkMode"
       :can-write="!isVirtualDirectory"
       :show-checkboxes="explorerSettings.showCheckboxes"
@@ -386,6 +417,7 @@ import { ref, computed, provide, onMounted, onBeforeUnmount, watch, watchEffect,
 import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
 import { useEventListener, useWindowScroll } from "@vueuse/core";
+import { useRoute, useRouter } from "vue-router";
 import { useThemeMode } from "@/composables/core/useThemeMode.js";
 import { IconBack, IconExclamation, IconSearch, IconSettings, IconXCircle } from "@/components/icons";
 import LoadingIndicator from "@/components/common/LoadingIndicator.vue";
@@ -406,6 +438,7 @@ import { useMountExplorerController } from "./useMountExplorerController.js";
 // å­ç»ä»?
 import BreadcrumbNav from "@/modules/fs/components/shared/BreadcrumbNav.vue";
 import DriveSidebar from "@/modules/fs/components/shared/DriveSidebar.vue";
+import DriveTrashView from "@/modules/fs/components/shared/DriveTrashView.vue";
 import DirectoryList from "@/modules/fs/components/directory/DirectoryList.vue";
 import DirectoryReadme from "@/modules/fs/components/DirectoryReadme.vue";
 import FileOperations from "@/modules/fs/components/shared/FileOperations.vue";
@@ -418,6 +451,7 @@ const SearchModal = defineAsyncComponent(() => import("@/modules/fs/components/s
 import PathPasswordDialog from "@/modules/fs/components/shared/modals/PathPasswordDialog.vue";
 import ConfirmDialog from "@/components/common/dialogs/ConfirmDialog.vue";
 import InputDialog from "@/components/common/dialogs/InputDialog.vue";
+const FileVersionsModal = defineAsyncComponent(() => import("@/modules/fs/components/shared/modals/FileVersionsModal.vue"));
 const FsMediaLightboxDialog = defineAsyncComponent(() => import("@/modules/fs/components/lightbox/FsMediaLightboxDialog.vue"));
 import PermissionManager from "@/components/common/PermissionManager.vue";
 const SettingsDrawer = defineAsyncComponent(() => import("@/modules/fs/components/shared/SettingsDrawer.vue"));
@@ -435,6 +469,27 @@ const log = createLogger("MountExplorerView");
 const validateFsItemNameDialog = createFsItemNameDialogValidator(t);
 
 const authStore = useAuthStore();
+const route = useRoute();
+const router = useRouter();
+
+const isTrashView = computed(() => {
+  const raw = route?.query?.trash;
+  return raw === "1" || raw === "true" || raw === 1 || raw === true;
+});
+
+const openTrashView = async () => {
+  const query = { ...(route?.query || {}), trash: "1" };
+  await router.replace({ path: route.path, query });
+};
+
+const closeTrashView = async () => {
+  const query = { ...(route?.query || {}) };
+  delete query.trash;
+  await router.replace({ path: route.path, query });
+};
+
+const versionsModalOpen = ref(false);
+const versionsModalItem = ref(null);
 
 // ä½¿ç¨ç»åå¼å½æ?
 const selection = useSelection();
@@ -681,6 +736,10 @@ const initContextMenu = () => {
   contextMenu = useContextMenu({
     onDownload: handleDownload,
     onGetLink: handleGetLink,
+    onShowVersions: (item) => {
+      versionsModalItem.value = item;
+      versionsModalOpen.value = true;
+    },
     onAddToQuickAccess: (itemsOrItem) => {
       const itemsArray = Array.isArray(itemsOrItem) ? itemsOrItem : [itemsOrItem];
       itemsArray.forEach((it) => {
@@ -1279,6 +1338,15 @@ const handleTaskCompleted = async (event) => {
       log.error('[MountExplorer] å·æ°ç®å½å¤±è´¥:', error);
     }
   }, 500);
+};
+
+const handleVersionRestored = async () => {
+  try {
+    invalidateCaches();
+    await refreshDirectory();
+  } catch (e) {
+    log.error("[MountExplorer] 版本还原后刷新失败:", e);
+  }
 };
 
 /**
